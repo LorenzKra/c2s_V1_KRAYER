@@ -1,0 +1,1745 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#dce4e9" />
+  <title>CARBON / SILICON — Parametric Development Configurator</title>
+
+  <!-- Three.js 0.160.0: einzige externe Laufzeit-Abhängigkeit -->
+  <!--
+    Three.js r160 classic build: wird absichtlich als normales Script geladen,
+    damit die Datei auch per Doppelklick (file://) gestartet werden kann.
+    r160 ist die letzte Version mit dem klassischen build/three.min.js.
+    Die Importmap bleibt als sauberer ES-Module-Fallback für Hosting/Live Server erhalten.
+  -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18242d;
+      --muted: #6f7c85;
+      --line: rgba(255,255,255,.72);
+      --glass: rgba(246,249,250,.79);
+      --glass-strong: rgba(249,251,252,.91);
+      --shadow: 0 18px 54px rgba(34,49,60,.16), 0 2px 8px rgba(34,49,60,.08);
+      --blue: #4c8cae;
+      --green: #21845b;
+      --red: #bd4a49;
+      --radius: 23px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: radial-gradient(ellipse at 50% 42%, #f1f5f5 0%, #e3e9ec 47%, #d7e0e5 100%);
+      -webkit-font-smoothing: antialiased;
+      font-synthesis: none;
+    }
+
+    #viewport { position: fixed; inset: 0; z-index: 1; overflow: hidden; }
+    #viewport canvas { display: block; width: 100%; height: 100%; outline: none; }
+    .ambient {
+      position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      background: radial-gradient(ellipse at 50% 45%, transparent 25%, rgba(223,231,234,.16) 75%, rgba(207,218,224,.3) 100%);
+    }
+
+    .hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+    .panel, .brand, .top-actions { pointer-events: auto; }
+    .panel {
+      position: absolute;
+      background: var(--glass);
+      border: 1px solid var(--line);
+      border-top-color: rgba(255,255,255,.95);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(26px) saturate(155%);
+      -webkit-backdrop-filter: blur(26px) saturate(155%);
+      overflow: hidden;
+    }
+
+    .brand {
+      position: absolute; top: 22px; left: 24px;
+      display: flex; align-items: center; gap: 11px;
+      padding: 10px 14px 10px 10px;
+      border: 1px solid rgba(255,255,255,.82);
+      border-radius: 18px;
+      background: rgba(248,251,252,.72);
+      box-shadow: 0 10px 28px rgba(35,52,64,.09);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    }
+    .brand-mark {
+      width: 33px; height: 33px; border-radius: 11px;
+      display: grid; place-items: center; color: #f5fafb;
+      background: linear-gradient(145deg, #203542, #5d8797);
+      font-size: 11px; font-weight: 800; letter-spacing: -.7px;
+      box-shadow: inset 0 1px rgba(255,255,255,.28);
+    }
+    .brand-name { font-size: 11px; font-weight: 800; letter-spacing: .16em; line-height: 1.2; }
+    .brand-sub { margin-top: 3px; color: var(--muted); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .top-actions { position: absolute; top: 22px; right: 24px; display: flex; gap: 8px; align-items: center; }
+    .status-pill {
+      display: flex; align-items: center; gap: 7px; padding: 10px 13px;
+      border: 1px solid rgba(255,255,255,.85); border-radius: 999px;
+      background: rgba(248,251,252,.72); color: #53616b; font-size: 10px; font-weight: 700;
+      letter-spacing: .07em; box-shadow: 0 8px 24px rgba(35,52,64,.08);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    }
+    .status-dot { width: 7px; height: 7px; background: #3ab47c; border-radius: 50%; box-shadow: 0 0 0 4px rgba(58,180,124,.13); }
+    .action-btn {
+      border: 1px solid rgba(255,255,255,.88); color: #f7fbfc;
+      background: linear-gradient(135deg, #263d4a, #456c7d);
+      border-radius: 13px; padding: 10px 15px; font: inherit; font-size: 11px; font-weight: 750;
+      letter-spacing: .02em; cursor: pointer; box-shadow: 0 9px 24px rgba(33,54,66,.19);
+      transition: transform .18s ease, filter .18s ease;
+    }
+    .action-btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+    .action-btn:active { transform: translateY(0); }
+    .action-btn.secondary { color: #344550; background: rgba(250,252,253,.84); box-shadow: 0 7px 18px rgba(35,52,64,.08); }
+
+    .left-panel {
+      top: 84px; left: 24px; bottom: 28px; width: 306px;
+      display: flex; flex-direction: column;
+    }
+    .right-panel {
+      top: 84px; right: 24px; bottom: 28px; width: 348px;
+      display: flex; flex-direction: column;
+    }
+    .panel-scroll { padding: 19px 18px 18px; overflow: auto; scrollbar-width: thin; scrollbar-color: rgba(81,105,119,.28) transparent; }
+    .panel-scroll::-webkit-scrollbar { width: 5px; }
+    .panel-scroll::-webkit-scrollbar-thumb { background: rgba(81,105,119,.24); border-radius: 99px; }
+    .eyebrow { color: #82909a; font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    .panel-title { margin: 5px 0 4px; font-size: 18px; font-weight: 760; letter-spacing: -.045em; }
+    .panel-intro { margin: 0 0 17px; color: #74818a; font-size: 10px; line-height: 1.5; }
+    .section-label {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 16px 0 9px; padding-top: 12px; border-top: 1px solid rgba(83,103,116,.13);
+      color: #53636d; font-size: 9px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase;
+    }
+    .section-label:first-of-type { margin-top: 0; }
+    .field { margin: 0 0 11px; }
+    .field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+    .field label { color: #50616b; font-size: 10px; font-weight: 650; }
+    .field output { color: #263b47; font-size: 10px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    select {
+      width: 100%; appearance: none; -webkit-appearance: none;
+      padding: 9px 34px 9px 11px; border: 1px solid rgba(96,120,133,.16); border-radius: 11px;
+      background: rgba(255,255,255,.74);
+      color: #263b47; font: inherit; font-size: 11px; font-weight: 650; outline: none;
+      box-shadow: inset 0 1px 2px rgba(28,48,60,.035);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23687d89' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+    select:focus { border-color: rgba(76,140,174,.65); box-shadow: 0 0 0 3px rgba(76,140,174,.12); }
+    input[type="range"] { width: 100%; margin: 1px 0 0; accent-color: #4e8eaa; cursor: pointer; }
+    .range-scale { display: flex; justify-content: space-between; margin-top: 2px; color: #9aa5ac; font-size: 8px; }
+    .mix-track { height: 6px; margin-top: 7px; overflow: hidden; border-radius: 99px; background: #dce3e6; }
+    .mix-fill { height: 100%; width: 35%; border-radius: inherit; background: linear-gradient(90deg,#ca895e,#d9a77e); transition: width .15s ease; }
+    .mix-legend { display: flex; justify-content: space-between; margin-top: 7px; color: #78858d; font-size: 9px; }
+    .mix-legend strong { color: #465761; font-weight: 750; }
+    .rule-note { margin-top: 13px; padding: 10px 11px; border: 1px solid rgba(94,125,141,.13); border-radius: 12px; background: rgba(255,255,255,.44); color: #6b7a83; font-size: 9px; line-height: 1.48; }
+    .rule-note strong { color: #40545f; }
+    .rule-details { margin-top: 10px; border: 1px solid rgba(94,125,141,.14); border-radius: 12px; background: rgba(255,255,255,.40); color: #6e7c84; }
+    .rule-details summary { padding: 9px 11px; cursor: pointer; color: #53646d; font-size: 9px; font-weight: 800; letter-spacing: .05em; list-style-position: inside; }
+    .rule-details[open] summary { border-bottom: 1px solid rgba(83,103,116,.12); }
+    .rule-details-body { padding: 9px 11px 10px; font-size: 8px; line-height: 1.55; }
+    .rule-details-body strong { color: #465b65; }
+    .rule-details-body div + div { margin-top: 5px; }
+    .action-btn.full { width: 100%; margin-top: 10px; padding: 11px 12px; }
+    .micro-note { margin: 5px 0 0; color: #85929a; font-size: 8px; line-height: 1.45; }
+    .kit-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+    .kit-item { padding: 8px 9px; border: 1px solid rgba(255,255,255,.72); border-radius: 11px; background: rgba(255,255,255,.45); }
+    .kit-item span { display: block; color: #87949b; font-size: 8px; }
+    .kit-item strong { display: block; margin-top: 3px; color: #40545f; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
+    .dev-field { min-width: 0; }
+    .dev-field label { display: block; margin-bottom: 4px; color: #687780; font-size: 8px; font-weight: 700; }
+    .dev-field input { width: 100%; min-width: 0; padding: 8px 8px; border: 1px solid rgba(96,120,133,.17); border-radius: 9px; background: rgba(255,255,255,.72); color: #2c414c; font: inherit; font-size: 10px; font-weight: 700; outline: none; }
+    .dev-field input:focus { border-color: rgba(76,140,174,.65); box-shadow: 0 0 0 3px rgba(76,140,174,.10); }
+    .dev-output { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+    .dev-stat { padding: 9px; border-radius: 11px; border: 1px solid rgba(255,255,255,.72); background: rgba(255,255,255,.50); min-width: 0; }
+    .dev-stat.wide { grid-column: 1 / -1; }
+    .dev-stat span { display: block; color: #87939a; font-size: 8px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+    .dev-stat strong { display: block; margin-top: 4px; color: #2b414c; font-size: 14px; font-weight: 800; letter-spacing: -.035em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .dev-stat strong.good { color: #21845b; }
+    .dev-stat strong.bad { color: #bd4a49; }
+    .dev-stat small { display: block; margin-top: 3px; color: #8b979d; font-size: 8px; line-height: 1.35; }
+    .sensitivity { display: grid; gap: 5px; margin-top: 8px; }
+    .sens-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border-radius: 9px; background: rgba(255,255,255,.45); color: #75838b; font-size: 8px; }
+    .sens-row strong { color: #40545f; font-size: 10px; font-variant-numeric: tabular-nums; }
+    .sens-row strong.negative { color: #bd4a49; }
+    .sens-row strong.positive { color: #21845b; }
+    .source-note { margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(83,103,116,.13); color: #89959b; font-size: 8px; line-height: 1.5; }
+    .source-note a { color: #527e93; text-decoration: none; border-bottom: 1px solid rgba(82,126,147,.35); }
+    .source-note a:hover { color: #2c607b; }
+    .toggle-on { background: linear-gradient(135deg, #4e7b76, #628f89) !important; color: #f7fbfc !important; }
+
+    .right-panel .panel-scroll { padding-bottom: 16px; }
+    .dashboard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .live-tag { padding: 5px 7px; border-radius: 7px; background: rgba(74,135,160,.12); color: #497e94; font-size: 8px; font-weight: 800; letter-spacing: .1em; }
+    .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .kpi {
+      min-height: 70px; padding: 11px 11px 9px; border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.76); background: rgba(255,255,255,.54);
+      box-shadow: inset 0 1px rgba(255,255,255,.72);
+    }
+    .kpi.wide { grid-column: 1 / -1; min-height: 66px; }
+    .kpi-label { color: #81909a; font-size: 8px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+    .kpi-value { margin-top: 6px; color: #233842; font-size: 19px; font-weight: 780; letter-spacing: -.055em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .kpi-value small { margin-left: 3px; color: #74828b; font-size: 9px; font-weight: 650; letter-spacing: 0; }
+    .kpi-sub { margin-top: 3px; color: #87939a; font-size: 8px; }
+    .kpi-value.yield-good { color: var(--green); }
+    .kpi-value.yield-bad { color: var(--red); }
+    .split-bars { display: flex; height: 7px; margin-top: 9px; overflow: hidden; border-radius: 99px; background: #e7ebed; }
+    .split-bars .res { background: #7da9a6; }
+    .split-bars .com { background: #d4a078; }
+    .usage-stats { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; color: #78858d; font-size: 8px; }
+    .usage-stats strong { color: #4d5e67; }
+    .formula-note { margin-top: 12px; padding-top: 11px; border-top: 1px solid rgba(83,103,116,.13); color: #87939a; font-size: 8px; line-height: 1.55; }
+    .formula-note strong { color: #5b6c75; }
+
+    .bottom-panel {
+      left: 50%; bottom: 22px; transform: translateX(-50%);
+      width: min(860px, calc(100vw - 730px)); height: 232px;
+      display: flex; flex-direction: column;
+    }
+    .plan-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 17px 7px; }
+    .floor-nav { display: flex; align-items: center; gap: 5px; padding: 0 17px 8px; overflow-x: auto; scrollbar-width: thin; }
+    .floor-nav-label { flex: 0 0 auto; margin-right: 3px; color: #87949b; font-size: 8px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .floor-btn { flex: 0 0 auto; min-width: 37px; padding: 6px 8px; border: 1px solid rgba(89,116,131,.18); border-radius: 8px; background: rgba(255,255,255,.58); color: #61717a; font: inherit; font-size: 9px; font-weight: 750; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+    .floor-btn:hover { border-color: rgba(76,140,174,.5); color: #315a6d; }
+    .floor-btn.active { border-color: #4f91ae; background: #426f83; color: #f6fafb; box-shadow: 0 3px 9px rgba(46,91,111,.18); }
+    .plan-title-wrap { display: flex; align-items: baseline; gap: 9px; }
+    .plan-title { color: #334650; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+    .plan-sub { color: #8a969d; font-size: 8px; }
+    .plan-legend { display: flex; align-items: center; gap: 10px; color: #77858d; font-size: 8px; }
+    .legend-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .legend-swatch { width: 8px; height: 8px; border-radius: 2px; }
+    #planCanvas { flex: 1; min-height: 0; width: 100%; display: block; margin: 0 0 8px; }
+    .plan-foot { display: flex; align-items: center; justify-content: space-between; padding: 0 17px 11px; color: #98a2a8; font-size: 8px; }
+    .plan-foot strong { color: #687981; font-weight: 750; }
+
+    #toast {
+      position: fixed; z-index: 20; left: 50%; bottom: 274px; transform: translate(-50%, 8px);
+      padding: 9px 13px; border: 1px solid rgba(255,255,255,.8); border-radius: 11px;
+      background: rgba(34,52,62,.88); color: #f4f8f9; box-shadow: 0 10px 24px rgba(20,36,44,.2);
+      font-size: 10px; opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+      backdrop-filter: blur(10px);
+    }
+    #toast.visible { opacity: 1; transform: translate(-50%, 0); }
+    .boot-error {
+      position: fixed; z-index: 50; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      width: min(520px, calc(100% - 36px)); padding: 20px 22px; border-radius: 18px;
+      background: rgba(255,250,247,.96); color: #573d35; border: 1px solid rgba(180,110,85,.25);
+      box-shadow: 0 20px 60px rgba(35,45,50,.2); font-size: 12px; line-height: 1.6; display: none;
+    }
+    .boot-error strong { display: block; margin-bottom: 5px; font-size: 14px; }
+
+    @media (max-width: 1240px) {
+      .left-panel { width: 276px; }
+      .right-panel { width: 310px; }
+      .bottom-panel { width: min(720px, calc(100vw - 630px)); }
+      .brand { top: 14px; left: 14px; }
+      .top-actions { top: 14px; right: 14px; }
+      .left-panel, .right-panel { top: 72px; bottom: 18px; }
+    }
+    @media (max-width: 980px) {
+      html, body { overflow: auto; min-height: 100%; }
+      #viewport { position: fixed; height: 100dvh; }
+      .hud { position: relative; min-height: 100dvh; padding: 72px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+      .brand { top: 12px; left: 12px; }
+      .top-actions { top: 12px; right: 12px; }
+      .status-pill { display: none; }
+      .left-panel, .right-panel, .bottom-panel {
+        position: relative; inset: auto; left: auto; right: auto; bottom: auto; top: auto;
+        transform: none; width: 100%; max-height: none; height: auto; overflow: visible;
+      }
+      .left-panel, .right-panel { display: block; }
+      .panel-scroll { max-height: none; }
+      .bottom-panel { height: 240px; flex: 0 0 240px; }
+      .bottom-panel .plan-head { flex-wrap: wrap; }
+      .floor-nav { padding-left: 13px; padding-right: 13px; }
+      .left-panel { order: 1; }
+      .right-panel { order: 2; }
+      .bottom-panel { order: 3; }
+      .hud { pointer-events: none; }
+      .panel, .brand, .top-actions { pointer-events: auto; }
+      body { overflow-y: auto; }
+    }
+    @media (max-width: 540px) {
+      .brand-name { font-size: 9px; }
+      .brand-sub { font-size: 7px; }
+      .brand { padding: 8px 10px 8px 8px; }
+      .brand-mark { width: 29px; height: 29px; }
+      .top-actions { gap: 5px; }
+      .action-btn { padding: 9px 10px; font-size: 9px; }
+      .panel { border-radius: 18px; }
+      .plan-legend { gap: 6px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport" aria-label="Interaktives 3D-Gebäudemodell"></div>
+  <div class="ambient"></div>
+
+  <div class="hud">
+    <div class="brand">
+      <div class="brand-mark">C/S</div>
+      <div>
+        <div class="brand-name">CARBON / SILICON</div>
+        <div class="brand-sub">Parametric infill configurator · Mainz</div>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <div class="status-pill"><span class="status-dot"></span><span id="systemStatus">3×3 M RASTER AKTIV</span></div>
+      <button class="action-btn secondary" id="contextToggle" type="button" title="Nachbarbebauung ein- oder ausblenden">Umfeld an</button>
+      <button class="action-btn secondary" id="resetView" type="button" title="Kameraperspektive zurücksetzen">Ansicht</button>
+      <button class="action-btn" id="exportBtn" type="button">↧ Export .glTF</button>
+    </div>
+
+    <aside class="panel left-panel">
+      <div class="panel-scroll">
+        <div class="eyebrow">01 / Parameter</div>
+        <h1 class="panel-title">Gebäude konfigurieren</h1>
+        <p class="panel-intro">Ein innerstädtischer Lückenschluss im konsequenten 3-Meter-Modulraster.</p>
+
+        <div class="section-label"><span>Grundstück & Kubatur</span><span>3 m GRID</span></div>
+        <div class="field">
+          <div class="field-head"><label for="widthSelect">Grundstücksbreite</label><output id="widthOut">15 m</output></div>
+          <select id="widthSelect">
+            <option value="9">9 m · 3 Module</option>
+            <option value="12">12 m · 4 Module</option>
+            <option value="15" selected>15 m · 5 Module</option>
+            <option value="18">18 m · 6 Module</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="depthSelect">Gebäudetiefe</label><output id="depthOut">18 m</output></div>
+          <select id="depthSelect">
+            <option value="12">12 m · 4 Module</option>
+            <option value="15">15 m · 5 Module</option>
+            <option value="18" selected>18 m · 6 Module</option>
+            <option value="21">21 m · 7 Module</option>
+            <option value="24">24 m · 8 Module</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="floorsSelect">Vollgeschosse</label><output id="floorsOut">5</output></div>
+          <select id="floorsSelect">
+            <option value="4">4 Geschosse</option>
+            <option value="5" selected>5 Geschosse</option>
+            <option value="6">6 Geschosse</option>
+            <option value="7">7 Geschosse</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="setbackSelect">Hof-Rücksprung ab 3. OG</label><output id="setbackOut">3 m</output></div>
+          <select id="setbackSelect">
+            <option value="0">0 m · kein Rücksprung</option>
+            <option value="3" selected>3 m · 1 Modul</option>
+            <option value="6">6 m · 2 Module</option>
+            <option value="9">9 m · 3 Module</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="streetSelect">Straßenbreite</label><output id="streetOut">9 m</output></div>
+          <select id="streetSelect"><option value="6">6 m · eng</option><option value="9" selected>9 m · mittel</option><option value="12">12 m · weit</option></select>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="neighborFloorsSelect">Traufhöhe Nachbarn</label><output id="neighborFloorsOut">5 Geschosse</output></div>
+          <select id="neighborFloorsSelect"><option value="4">4 Geschosse · 12 m</option><option value="5" selected>5 Geschosse · 15 m</option><option value="6">6 Geschosse · 18 m</option></select>
+        </div>
+
+        <div class="section-label"><span>Nutzungsmix</span><span>EG → OBEN</span></div>
+        <div class="field">
+          <div class="field-head"><label for="mixRange">Gewerbeanteil</label><output id="mixOut">30 %</output></div>
+          <input id="mixRange" type="range" min="0" max="100" step="10" value="30" />
+          <div class="range-scale"><span>0 %</span><span>50 %</span><span>100 %</span></div>
+          <div class="mix-track"><div class="mix-fill" id="mixFill"></div></div>
+          <div class="mix-legend"><span><strong>Wohnen</strong> · Restfläche</span><span><strong>Gewerbe</strong> · von unten</span></div>
+        </div>
+
+        <div class="section-label"><span>Ausstattungsstandard</span><span>FASSADE</span></div>
+        <div class="field">
+          <div class="field-head"><label for="qualitySelect">Standard</label><output id="qualityCost">3.400 €/m²</output></div>
+          <select id="qualitySelect">
+            <option value="basic">Basic · Putz / Lochfenster</option>
+            <option value="medium" selected>Medium · Klinker / Balkone</option>
+            <option value="premium">Premium · Curtain Wall</option>
+          </select>
+        </div>
+
+        <div class="section-label"><span>Kit of Parts / Zirkularität</span><span id="kitBadge">MODULAR</span></div>
+        <div class="kit-list">
+          <div class="kit-item"><span>Voxel / Decken</span><strong id="kitVoxels">—</strong></div>
+          <div class="kit-item"><span>Fassadenmodule</span><strong id="kitFacade">—</strong></div>
+          <div class="kit-item"><span>TGA-Bausteine</span><strong id="kitCore">—</strong></div>
+          <div class="kit-item"><span>Balkonmodule</span><strong id="kitBalconies">—</strong></div>
+        </div>
+        <div class="field" style="margin-top:11px">
+          <div class="field-head"><label for="originSelect">Materialherkunft (Szenario)</label></div>
+          <select id="originSelect"><option value="reuse">Wiederverwendung · Faktor 1,00</option><option value="recycled" selected>Recycling · Faktor 0,75</option><option value="renewable">Erneuerbar · Faktor 0,75</option><option value="primary">Primär, nicht erneuerbar · 0,00</option></select>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="connectionSelect">Fügesystem</label></div>
+          <select id="connectionSelect"><option value="click">Steck-/Klickverbindung · 1,00</option><option value="screw" selected>Geschraubt · 0,75</option><option value="standard">Standard, lösbar · 0,50</option><option value="fixed">Festverbaut · 0,25</option><option value="monolithic">Monolithisch · 0,00</option></select>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="sortingSelect">Sortenreine Trennbarkeit</label></div>
+          <select id="sortingSelect"><option value="high" selected>Hohe Trennbarkeit · 1,00</option><option value="medium">Teilweise trennbar · 0,50</option><option value="low">Nicht trennbar · 0,00</option></select>
+        </div>
+        <button class="action-btn full" id="maximizeYieldBtn" type="button">✦ Maximale Rendite finden</button>
+        <p class="micro-note">Optimiert Nutzungsmix und Standard bei unveränderter Grundstücks- und Höhenkonfiguration.</p>
+        <div class="rule-note" id="ruleNote">
+          <strong>Rasterlogik:</strong> Tragmodule stehen geschossweise übereinander. Der TGA-Kern bleibt als durchlaufender 3 × 6 m-Baustein an der linken Brandwand erhalten.
+        </div>
+        <details class="rule-details">
+          <summary>Regelsystem & Bauteil-Vokabular öffnen</summary>
+          <div class="rule-details-body">
+            <div><strong>01 · Tragzelle:</strong> 3 × 3 × 3 m; 9 m² Modul-BGF, geschossweise deckungsgleich gestapelt.</div>
+            <div><strong>02 · Deckenscheibe:</strong> 3 × 3 m; bildet die horizontale Last- und Rasterebene.</div>
+            <div><strong>03 · Hüllmodul:</strong> 3 m Fassadenfeld; Basic = Lochfenster, Medium = bodentief + Balkon, Premium = Curtain Wall.</div>
+            <div><strong>04 · TGA-Baustein:</strong> 3 × 6 m an der linken Brandwand; über alle Geschosse fluchtend.</div>
+            <div><strong>05 · Hofmodul:</strong> Rücksprung in 3-m-Schritten ab 3. OG; obere Zellen müssen auf unteren Zellen stehen.</div>
+            <div><strong>06 · Belichtungsregel:</strong> Belichtung nur Straße/Hof; bei mehr als 15 m Tiefe werden innere Rasterzellen nicht vermietet.</div>
+            <div><strong>07 · Nutzungsregel:</strong> Gewerbe-Kontingent wird ab EG deterministisch nach oben belegt; Rest = Wohnen.</div>
+            <div><strong>Algorithmus:</strong> Grundstück → Raster → Kern → Stützkontrolle → Dunkelzone → Nutzung → Fassade → Kennwerte / Export.</div>
+          </div>
+        </details>
+      </div>
+    </aside>
+
+    <aside class="panel right-panel">
+      <div class="panel-scroll">
+        <div class="dashboard-head">
+          <div>
+            <div class="eyebrow">02 / Performance</div>
+            <h2 class="panel-title">Projekt-Dashboard</h2>
+          </div>
+          <div class="live-tag">LIVE MODEL</div>
+        </div>
+        <p class="panel-intro">Kennwerte aus dem aktuellen Modulmodell · vereinfachte Vorentwurfsbilanz.</p>
+
+        <div class="section-label"><span>DIN 277 / Kubatur</span><span>01—04</span></div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label">BGF · R</div><div class="kpi-value" id="bgfValue">— <small>m²</small></div><div class="kpi-sub">Brutto-Grundfläche</div></div>
+          <div class="kpi"><div class="kpi-label">BRI</div><div class="kpi-value" id="briValue">— <small>m³</small></div><div class="kpi-sub">Brutto-Rauminhalt</div></div>
+          <div class="kpi"><div class="kpi-label">Hüllfläche</div><div class="kpi-value" id="envelopeValue">— <small>m²</small></div><div class="kpi-sub">inkl. Brandwände*</div></div>
+          <div class="kpi"><div class="kpi-label">A / V</div><div class="kpi-value" id="avValue">— <small>1/m</small></div><div class="kpi-sub">Kompaktheit</div></div>
+        </div>
+
+        <div class="section-label"><span>Flächen & Einheiten</span><span>05—08</span></div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label">Mietfläche · MF</div><div class="kpi-value" id="mfValue">— <small>m²</small></div><div class="kpi-sub">ohne Kern / Dunkelzone</div></div>
+          <div class="kpi"><div class="kpi-label">MF / BGF</div><div class="kpi-value" id="effValue">— <small>%</small></div><div class="kpi-sub">Flächeneffizienz</div></div>
+          <div class="kpi"><div class="kpi-label">Wohneinheiten</div><div class="kpi-value" id="resUnitsValue">—</div><div class="kpi-sub" id="resAreaSub">— m² Wohnen</div></div>
+          <div class="kpi"><div class="kpi-label">Gewerbeeinheiten</div><div class="kpi-value" id="comUnitsValue">—</div><div class="kpi-sub" id="comAreaSub">— m² Gewerbe</div></div>
+        </div>
+        <div class="split-bars" aria-label="Flächenverteilung"><div class="res" id="resBar" style="width:70%"></div><div class="com" id="comBar" style="width:30%"></div></div>
+        <div class="usage-stats"><span>Wohnen <strong id="resPct">70 %</strong></span><span>Gewerbe <strong id="comPct">30 %</strong></span></div>
+        <div class="section-label"><span>Belichtung / Zirkularität</span><span>13—15</span></div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label">Außenbezug MF</div><div class="kpi-value" id="daylightValue">— <small>%</small></div><div class="kpi-sub">Mietzellen an Straße / Hof</div></div>
+          <div class="kpi"><div class="kpi-label">Dunkelzonen</div><div class="kpi-value" id="darkPctValue">— <small>%</small></div><div class="kpi-sub">Anteil am Nicht-Kern</div></div>
+          <div class="kpi wide"><div class="kpi-label">Zirkularitäts-Potenzial</div><div class="kpi-value" id="circularityValue">— <small>/ 100</small></div><div class="kpi-sub" id="circularitySub">Materialherkunft · Fügung · Trennbarkeit</div></div>
+        </div>
+
+        <div class="section-label"><span>Ökonomie / Carbon</span><span>09—12</span></div>
+        <div class="kpi-grid">
+          <div class="kpi wide"><div class="kpi-label">Jahres-Nettokaltmiete · Mainz-Ansatz</div><div class="kpi-value" id="rentValue">— <small>€/a</small></div><div class="kpi-sub" id="rentSub">Monatliche Mietansätze nach Standard</div></div>
+          <div class="kpi"><div class="kpi-label">Baukosten</div><div class="kpi-value" id="costValue">— <small>€</small></div><div class="kpi-sub" id="costSub">BGF × Kostenkennwert</div></div>
+          <div class="kpi"><div class="kpi-label">Bruttoanfangsrendite</div><div class="kpi-value" id="yieldValue">— <small>%</small></div><div class="kpi-sub">Zielkorridor 4,5–6,0 %</div></div>
+          <div class="kpi wide"><div class="kpi-label">Graue Energie · CO₂-Rucksack</div><div class="kpi-value" id="carbonValue">— <small>t CO₂e</small></div><div class="kpi-sub" id="carbonSub">BRI × Standardfaktor</div></div>
+        </div>
+        <div class="formula-note">
+          <strong>Rechenannahmen:</strong> Geschosshöhe 3,00 m; Modulfläche 9 m². Mieten gemäß Aufgabenbrief (Mainz 2026), als Monatsmiete angesetzt. Baukosten auf BGF. CO₂-Faktoren als Szenarioindikatoren, nicht als Ökobilanz nach EPD.<br />
+          *Hüllfläche geometrisch vereinfacht inkl. seitlicher Brandwände sowie Boden- und Dachfläche.
+        </div>
+
+        <div class="section-label"><span>Projektentwickler / Machbarkeit</span><span>SCREENING</span></div>
+        <p class="panel-intro" style="margin-bottom:8px">Editierbare Annahmen für eine frühe Residualwert- und Risikoindikation. Voreinstellung: optimistisches Lehr-/Upside-Szenario mit Mietfaktor 1,20; kein nachgewiesener Mainzer Marktmietwert. Alle Werte sind editierbare Annahmen, keine Marktprognosen.</p>
+        <div class="dev-grid">
+          <div class="dev-field"><label for="landPrice">Bodenwert €/m² · 0 = offen</label><input id="landPrice" type="number" min="0" max="20000" step="50" value="0"></div>
+          <div class="dev-field"><label for="softPct">Baunebenkosten %</label><input id="softPct" type="number" min="0" max="60" step="1" value="12"></div>
+          <div class="dev-field"><label for="contingencyPct">Risikopuffer %</label><input id="contingencyPct" type="number" min="0" max="40" step="1" value="5"></div>
+          <div class="dev-field"><label for="financePct">Finanzierung % p.a.</label><input id="financePct" type="number" min="0" max="20" step="0.25" value="3.5"></div>
+          <div class="dev-field"><label for="durationYears">Entwicklungszeit Jahre</label><input id="durationYears" type="number" min="0.5" max="6" step="0.5" value="1.5"></div>
+          <div class="dev-field"><label for="vacancyPct">Mietausfall %</label><input id="vacancyPct" type="number" min="0" max="30" step="0.5" value="2"></div>
+          <div class="dev-field"><label for="opexPct">Bewirtschaftung %</label><input id="opexPct" type="number" min="0" max="40" step="0.5" value="3"></div>
+          <div class="dev-field"><label for="exitYield">Exit-Kapitalisierung %</label><input id="exitYield" type="number" min="2" max="12" step="0.1" value="3.5"></div>
+          <div class="dev-field"><label for="targetMargin">Zielmarge %</label><input id="targetMargin" type="number" min="0" max="40" step="1" value="8"></div>
+          <div class="dev-field"><label for="landFeesPct">Erwerbsnebenkosten %</label><input id="landFeesPct" type="number" min="0" max="20" step="0.5" value="8"></div>
+          <div class="dev-field"><label for="rentFactor">Miet-Szenariofaktor</label><input id="rentFactor" type="number" min="0.8" max="1.5" step="0.05" value="1.20"></div>
+        </div>
+        <div class="dev-output">
+          <div class="dev-stat"><span>Netto-Betriebsertrag / NOI</span><strong id="noiValue">—</strong><small>p.a. nach Leerstand und Bewirtschaftung</small></div>
+          <div class="dev-stat"><span>Indikativer Exit-Wert</span><strong id="exitValue">—</strong><small>NOI ÷ Exit-Kapitalisierung</small></div>
+          <div class="dev-stat wide"><span>Residualer Grundstückswert</span><strong id="residualValue">—</strong><small id="residualSub">Maximaler Grundstückskaufpreis bei Zielmarge · €/m² Grundstück</small></div>
+          <div class="dev-stat"><span>Projektüberschuss</span><strong id="projectSurplus">—</strong><small id="projectMarginSub">Exit-Wert minus Gesamtinvestition</small></div>
+          <div class="dev-stat"><span>Break-even-Miete</span><strong id="breakEvenRent">—</strong><small>Ø €/m² / Monat zur Kostendeckung</small></div>
+        </div>
+        <div class="section-label" style="margin-top:14px"><span>Sensitivität</span><span>STRESS / BASIS / UPSIDE</span></div>
+        <div class="sensitivity">
+          <div class="sens-row"><span>Stress · Miete −10 % / Kosten +10 % / Exit +0,5 pp</span><strong id="stressResult">—</strong></div>
+          <div class="sens-row"><span>Basis · aktuelle Annahmen</span><strong id="baseResult">—</strong></div>
+          <div class="sens-row"><span>Upside · Miete +5 % / Kosten −5 % / Exit −0,25 pp</span><strong id="upsideResult">—</strong></div>
+        </div>
+        <div class="source-note">
+          <strong>Methodik / Grenzen:</strong> Vereinfachte Residualwert-Heuristik, kein Verkehrswertgutachten und keine vollständige DCF-Kalkulation. Voreinstellung ist bewusst ein positives Upside-Lehr-Szenario (Mietfaktor 1,20; Exit 3,5 %; geringe Leerstands-/Kostenquoten; Bodenwert zunächst 0 €), damit die Marge im Demonstrationsfall positiv sichtbar wird. Das ist keine belegte Marktaussage und muss für eine reale Projektentwicklung durch Standort-, Miet- und Grundstücksdaten ersetzt werden. Die ImmoWertV leitet den Reinertrag u. a. aus Rohertrag abzüglich Bewirtschaftungskosten ab; diese Logik wird hier nur vereinfacht gespiegelt (<a href="https://www.gesetze-im-internet.de/immowertv_2022/__31.html" target="_blank" rel="noopener">ImmoWertV § 31</a>). Einen standortbezogenen Bodenwert bitte aus dem amtlichen <a href="https://maps.rlp.de/viewer/bodenrichtwerte/" target="_blank" rel="noopener">BORIS.RLP-Viewer</a> übernehmen (Beschlussstichtag 01.01.2026). Zirkularitätsfaktoren sind an DGNB-Klassen angelehnt, aber kein DGNB-Nachweis (<a href="https://www.dgnb.de/de/nachhaltiges-bauen/zirkulaeres-bauen/zirkularitaetsindizes-fuer-bauwerke" target="_blank" rel="noopener">DGNB-Index</a>). Außenbezug ist ein Raster-Proxy, keine Tageslichtsimulation nach DIN EN 17037.
+        </div>
+      </div>
+    </aside>
+
+    <section class="panel bottom-panel" aria-label="Geschosswahl und prozedurale Grundrisse">
+      <div class="plan-head">
+        <div class="plan-title-wrap"><span class="plan-title" id="planTitle">03 / Geschossplan · EG</span><span class="plan-sub" id="planMeta">3 × 3 m Voxelplan</span></div>
+        <div class="plan-legend">
+          <span class="legend-item"><i class="legend-swatch" style="background:#dce9e5"></i>Wohnen</span>
+          <span class="legend-item"><i class="legend-swatch" style="background:#f1dfcf"></i>Gewerbe</span>
+          <span class="legend-item"><i class="legend-swatch" style="background:#e5e8eb"></i>Dunkel</span>
+          <span class="legend-item"><i class="legend-swatch" style="background:#cbd7df"></i>TGA</span>
+        </div>
+      </div>
+      <div class="floor-nav" id="floorNav" aria-label="Geschoss auswählen"><span class="floor-nav-label">Geschoss</span></div>
+      <canvas id="planCanvas" aria-label="Generierter Grundriss des Erdgeschosses"></canvas>
+      <div class="plan-foot"><span id="planFootLabel"><strong>STRASSE</strong> ↑ vorne · Eingang führt direkt in den Flur · EG ohne Balkone</span><span id="planScale">Raster 3,00 m</span></div>
+    </section>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div class="boot-error" id="bootError"><strong>3D-Engine konnte nicht geladen werden.</strong><span id="bootErrorText">Bitte prüfe die Internetverbindung zum Three.js-CDN. Die Datei kann per Doppelklick oder über einen lokalen Server geöffnet werden.</span></div>
+
+  <script>
+    'use strict';
+
+    // -------------------------------------------------------------------------
+    // 0. DOM, Konstanten und Formatierung
+    // -------------------------------------------------------------------------
+    const $ = (id) => document.getElementById(id);
+    const MODULE = 3;
+    const FLOOR_HEIGHT = 3;
+    const MODULE_AREA = MODULE * MODULE;
+    const DAYLIGHT_LIMIT = 7.5;
+    const fmt0 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+    const fmt1 = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const fmt2 = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const currency0 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+
+    const STANDARD = {
+      basic:   { label: 'Basic',   cost: 2700, resRent: 12.50, comRent: 15.00, carbon: 250 },
+      medium:  { label: 'Medium',  cost: 3400, resRent: 16.00, comRent: 19.00, carbon: 320 },
+      premium: { label: 'Premium', cost: 4500, resRent: 21.00, comRent: 25.00, carbon: 450 }
+    };
+
+    const state = {
+      width: 15, depth: 18, floors: 5, setback: 3,
+      streetWidth: 9, neighborFloors: 5,
+      commercialPct: 30, quality: 'medium',
+      origin: 'recycled', connection: 'screw', sorting: 'high'
+    };
+
+    let THREE, OrbitControlsImpl = null;
+    let scene, camera, renderer, controls, modelRoot, contextRoot;
+    let resizeObserver, toastTimer;
+    let latestLayout = null;
+    let selectedFloorLevel = 0; // EG ist beim Start vorausgewählt.
+    let previousGeometrySignature = null;
+    let animationFrame = 0;
+
+    // -------------------------------------------------------------------------
+    // 1. Eingaben: ausschließlich Werte im 3-m-Raster
+    // -------------------------------------------------------------------------
+    function readState() {
+      state.width = Number($('widthSelect').value);
+      state.depth = Number($('depthSelect').value);
+      state.floors = Number($('floorsSelect').value);
+      state.setback = Number($('setbackSelect').value);
+      state.streetWidth = Number($('streetSelect').value);
+      state.neighborFloors = Number($('neighborFloorsSelect').value);
+      state.commercialPct = Number($('mixRange').value);
+      state.quality = $('qualitySelect').value;
+      state.origin = $('originSelect').value;
+      state.connection = $('connectionSelect').value;
+      state.sorting = $('sortingSelect').value;
+
+      // Defensive Normalisierung: auch manuell veränderte DOM-Werte bleiben rasterkonform.
+      state.width = Math.min(18, Math.max(9, Math.round(state.width / MODULE) * MODULE));
+      state.depth = Math.min(24, Math.max(12, Math.round(state.depth / MODULE) * MODULE));
+      state.floors = Math.min(7, Math.max(4, Math.round(state.floors)));
+      state.setback = Math.min(9, Math.max(0, Math.round(state.setback / MODULE) * MODULE));
+      state.streetWidth = [6, 9, 12].includes(state.streetWidth) ? state.streetWidth : 9;
+      state.neighborFloors = Math.min(6, Math.max(4, Math.round(state.neighborFloors)));
+      state.commercialPct = Math.min(100, Math.max(0, Math.round(state.commercialPct / 10) * 10));
+      if (!STANDARD[state.quality]) state.quality = 'medium';
+      if (!['reuse','recycled','renewable','primary'].includes(state.origin)) state.origin = 'recycled';
+      if (!['click','screw','standard','fixed','monolithic'].includes(state.connection)) state.connection = 'screw';
+      if (!['high','medium','low'].includes(state.sorting)) state.sorting = 'high';
+      return { ...state };
+    }
+
+    function syncControls(p) {
+      $('widthOut').textContent = `${p.width} m`;
+      $('depthOut').textContent = `${p.depth} m`;
+      $('floorsOut').textContent = String(p.floors);
+      $('setbackOut').textContent = `${p.setback} m`;
+      $('streetOut').textContent = `${p.streetWidth} m`;
+      $('neighborFloorsOut').textContent = `${p.neighborFloors} Geschosse`;
+      $('mixOut').textContent = `${p.commercialPct} %`;
+      $('mixFill').style.width = `${p.commercialPct}%`;
+      $('qualityCost').textContent = `${fmt0.format(STANDARD[p.quality].cost)} €/m²`;
+    }
+
+    function keyOf(x, y) { return `${x},${y}`; }
+
+    // DGNB-inspirierte Klassenfaktoren (0–1); der resultierende Wert ist ein eigener Proxy.
+    const CIRCULAR_FACTORS = {
+      origin: { reuse: 1.00, recycled: .75, renewable: .75, primary: 0.00 },
+      connection: { click: 1.00, screw: .75, standard: .50, fixed: .25, monolithic: 0.00 },
+      sorting: { high: 1.00, medium: .50, low: 0.00 }
+    };
+
+    function circularityScore(p) {
+      const f = CIRCULAR_FACTORS;
+      return ((f.origin[p.origin] ?? 0) + (f.connection[p.connection] ?? 0) + (f.sorting[p.sorting] ?? 0)) / 3 * 100;
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Raster- und Nutzungslogik
+    // -------------------------------------------------------------------------
+    function generateLayout(p) {
+      const cols = p.width / MODULE;
+      const rows = p.depth / MODULE;
+      const setbackModules = p.setback / MODULE;
+      const coreStart = Math.floor((rows - 2) / 2);
+      const coreRows = [coreStart, coreStart + 1];
+      const floors = [];
+      const allCells = [];
+      const rentable = [];
+
+      for (let level = 0; level < p.floors; level++) {
+        // Rücksprung beginnt am 3. OG: EG=0, 1.OG=1, 2.OG=2, 3.OG=3.
+        const isSetbackLevel = level >= 3;
+        const activeRows = isSetbackLevel ? Math.max(1, rows - setbackModules) : rows;
+        const cellMap = new Map();
+        const floorCells = [];
+
+        for (let y = 0; y < activeRows; y++) {
+          for (let x = 0; x < cols; x++) {
+            const cell = { x, y, level, type: 'rentable', use: 'residential', key: keyOf(x, y) };
+            cellMap.set(cell.key, cell);
+            floorCells.push(cell);
+          }
+        }
+
+        // Der 3 × 6 m-Kern wird unabhängig vom Hofrücksprung auf jedem Geschoss ergänzt.
+        // So bleibt sein Lastpfad vom EG bis zum Dach durchgehend und deckungsgleich.
+        for (const y of coreRows) {
+          const key = keyOf(0, y);
+          if (!cellMap.has(key)) {
+            const cell = { x: 0, y, level, type: 'core', use: 'core', key };
+            cellMap.set(key, cell);
+            floorCells.push(cell);
+          } else {
+            const cell = cellMap.get(key);
+            cell.type = 'core';
+            cell.use = 'core';
+          }
+        }
+
+        for (const cell of floorCells) {
+          if (cell.type === 'core') continue;
+          // EG-Erschließung: ein zusammenhängender Zugangsstreifen führt vom Straßeneingang
+          // in der linken Rasterachse direkt zum fluchtenden Treppen-/TGA-Kern.
+          if (level === 0 && cell.x === 0 && cell.y < coreStart) {
+            cell.type = 'access';
+            cell.use = 'access';
+            continue;
+          }
+          const frontDistance = (cell.y + 0.5) * MODULE;
+          const rearDistance = (activeRows - cell.y - 0.5) * MODULE;
+          // Bei Gebäudetiefen > 15 m werden Zellen ab 7,5 m Abstand zu
+          // beiden belichtenden Fassaden als nicht vermietbare Dunkelzone markiert.
+          const isDark = activeRows * MODULE > 15 && Math.min(frontDistance, rearDistance) >= DAYLIGHT_LIMIT - 1e-6;
+          if (isDark) {
+            cell.type = 'dark';
+            cell.use = 'dark';
+          } else {
+            rentable.push(cell);
+          }
+        }
+
+        floors.push({ level, activeRows, cellMap, cells: floorCells });
+        allCells.push(...floorCells);
+      }
+
+      // Gewerbe wird als zusammenhängendes Flächenkontingent von unten nach oben vergeben.
+      // Die Sortierung ist deterministisch: Geschoss, Straße→Hof, links→rechts.
+      rentable.sort((a, b) => a.level - b.level || a.y - b.y || a.x - b.x);
+      const commercialCount = Math.round(rentable.length * p.commercialPct / 100);
+      rentable.forEach((cell, index) => {
+        cell.use = index < commercialCount ? 'commercial' : 'residential';
+      });
+
+      const countBy = (predicate) => allCells.filter(predicate).length;
+      const rentableCells = rentable.length;
+      const commercialCells = rentable.filter(c => c.use === 'commercial').length;
+      const residentialCells = rentableCells - commercialCells;
+      const coreCells = countBy(c => c.type === 'core');
+      const darkCells = countBy(c => c.type === 'dark');
+      const bgf = allCells.length * MODULE_AREA;
+      const mf = rentableCells * MODULE_AREA;
+      const residentialArea = residentialCells * MODULE_AREA;
+      const commercialArea = commercialCells * MODULE_AREA;
+      const bri = bgf * FLOOR_HEIGHT;
+
+      // Vereinfachte geometrische Hüllfläche: exponierte Seiten je Rasterzelle
+      // plus Unterseite und Dach. Brandwände werden explizit mitgezählt.
+      let verticalEnvelope = 0;
+      for (const floor of floors) {
+        for (const cell of floor.cells) {
+          const neighbors = [
+            [cell.x - 1, cell.y], [cell.x + 1, cell.y],
+            [cell.x, cell.y - 1], [cell.x, cell.y + 1]
+          ];
+          for (const [nx, ny] of neighbors) {
+            if (!floor.cellMap.has(keyOf(nx, ny))) verticalEnvelope += MODULE_AREA;
+          }
+        }
+      }
+      const baseArea = floors[0]?.cells.length * MODULE_AREA || 0;
+      const roofArea = floors[floors.length - 1]?.cells.length * MODULE_AREA || 0;
+      const envelope = verticalEnvelope + baseArea + roofArea;
+      const av = bri > 0 ? envelope / bri : 0;
+
+      const standard = STANDARD[p.quality];
+      const annualRent = (residentialArea * standard.resRent + commercialArea * standard.comRent) * 12;
+      const constructionCost = bgf * standard.cost;
+      const yieldPct = constructionCost > 0 ? annualRent / constructionCost * 100 : 0;
+      const embodiedCarbonKg = bri * standard.carbon;
+      const efficiency = bgf > 0 ? mf / bgf * 100 : 0;
+      const facadeRentableCells = floors.reduce((sum, floor) => sum + floor.cells.filter(c => c.type === 'rentable' && (c.y === 0 || c.y === floor.activeRows - 1)).length, 0);
+      const sideWallModules = floors.reduce((sum, floor) => sum + floor.cells.filter(c => !floor.cellMap.has(keyOf(c.x - 1, c.y)) || !floor.cellMap.has(keyOf(c.x + 1, c.y))).length, 0);
+      const outsideContactPct = rentableCells > 0 ? facadeRentableCells / rentableCells * 100 : 0;
+      const darkPct = (darkCells + rentableCells) > 0 ? darkCells / (darkCells + rentableCells) * 100 : 0;
+      const facadeModuleCount = facadeRentableCells + floors.reduce((sum, floor) => sum + floor.cells.filter(c => c.type === 'core' && (c.y === 0 || c.y === floor.activeRows - 1)).length, 0);
+      const balconyCount = p.quality === 'medium' ? floors.reduce((sum, floor) => sum + (floor.level > 0 ? floor.cells.filter(c => c.type !== 'core' && (c.y === 0 || c.y === floor.activeRows - 1)).length : 0), 0) : 0;
+
+      return {
+        params: p, cols, rows, coreRows, floors, allCells,
+        rentableCells, commercialCells, residentialCells, coreCells, darkCells,
+        bgf, bri, envelope, av, mf, residentialArea, commercialArea,
+        annualRent, constructionCost, yieldPct, embodiedCarbonKg,
+        efficiency, roofArea, baseArea, facadeRentableCells, sideWallModules,
+        outsideContactPct, darkPct, facadeModuleCount, balconyCount
+      };
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. KPI-Dashboard
+    // -------------------------------------------------------------------------
+    function setKpi(id, value, unit = '') {
+      $(id).innerHTML = `${value}${unit ? ` <small>${unit}</small>` : ''}`;
+    }
+
+    function updateDashboard(layout) {
+      const p = layout.params;
+      const s = STANDARD[p.quality];
+      setKpi('bgfValue', fmt0.format(layout.bgf), 'm²');
+      setKpi('briValue', fmt0.format(layout.bri), 'm³');
+      setKpi('envelopeValue', fmt0.format(layout.envelope), 'm²');
+      setKpi('avValue', fmt2.format(layout.av), '1/m');
+      setKpi('mfValue', fmt0.format(layout.mf), 'm²');
+      setKpi('effValue', fmt1.format(layout.efficiency), '%');
+      setKpi('resUnitsValue', fmt0.format(Math.round(layout.residentialArea / 60)));
+      setKpi('comUnitsValue', fmt0.format(Math.round(layout.commercialArea / 150)));
+      $('resAreaSub').textContent = `${fmt0.format(layout.residentialArea)} m² Wohnen`;
+      $('comAreaSub').textContent = `${fmt0.format(layout.commercialArea)} m² Gewerbe`;
+      setKpi('rentValue', currency0.format(layout.annualRent), '€/a');
+      setKpi('costValue', currency0.format(layout.constructionCost), '€');
+      setKpi('yieldValue', fmt2.format(layout.yieldPct), '%');
+      setKpi('carbonValue', fmt0.format(layout.embodiedCarbonKg / 1000), 't CO₂e');
+
+      const yieldEl = $('yieldValue');
+      yieldEl.classList.remove('yield-good', 'yield-bad');
+      yieldEl.classList.add(layout.yieldPct >= 4.5 && layout.yieldPct <= 6.0 ? 'yield-good' : 'yield-bad');
+
+      const resPct = layout.mf > 0 ? layout.residentialArea / layout.mf * 100 : 0;
+      const comPct = layout.mf > 0 ? layout.commercialArea / layout.mf * 100 : 0;
+      $('resBar').style.width = `${resPct}%`;
+      $('comBar').style.width = `${comPct}%`;
+      $('resPct').textContent = `${Math.round(resPct)} %`;
+      $('comPct').textContent = `${Math.round(comPct)} %`;
+      $('rentSub').textContent = `W ${fmt2.format(s.resRent)} € / m² · G ${fmt2.format(s.comRent)} € / m² monatlich`;
+      $('costSub').textContent = `${fmt0.format(s.cost)} €/m² BGF · ${s.label}`;
+      $('carbonSub').textContent = `${fmt0.format(s.carbon)} kg CO₂e/m³ BRI · Szenariofaktor`;
+      $('planMeta').textContent = `${layout.cols} × ${layout.rows} Rasterzellen · TGA ${layout.coreCells} Zellen`;
+      $('systemStatus').textContent = `${layout.cols}×${layout.rows} GRID · ${p.floors} LEVELS`;
+      $('kitVoxels').textContent = fmt0.format(layout.allCells.length);
+      $('kitFacade').textContent = fmt0.format(layout.facadeModuleCount);
+      $('kitCore').textContent = fmt0.format(layout.coreCells);
+      $('kitBalconies').textContent = fmt0.format(layout.balconyCount);
+      $('daylightValue').innerHTML = `${fmt1.format(layout.outsideContactPct)} <small>%</small>`;
+      $('darkPctValue').innerHTML = `${fmt1.format(layout.darkPct)} <small>%</small>`;
+      $('circularityValue').innerHTML = `${fmt0.format(circularityScore(p))} <small>/ 100</small>`;
+      const originName = { reuse:'Wiederverwendung', recycled:'Recycling', renewable:'Erneuerbar', primary:'Primärrohstoff' }[p.origin];
+      const connectionName = { click:'Steck/Klick', screw:'Schraub', standard:'Standard', fixed:'Festverbaut', monolithic:'Monolithisch' }[p.connection];
+      $('circularitySub').textContent = `${originName} · ${connectionName} · ${p.sorting === 'high' ? 'sortenrein' : p.sorting === 'medium' ? 'teilweise trennbar' : 'gemischt'}`;
+
+      const darkText = p.depth > 15
+        ? `${layout.darkCells} Dunkelzellen ohne Mietertrag`
+        : 'Tiefe ≤ 15 m: keine algorithmische Dunkelzone';
+      const heightNote = p.floors > p.neighborFloors ? `Achtung: ${p.floors} VG überragen den Nachbarbezug von ${p.neighborFloors} VG.` : `Traufhöhe im Bezug zu ${p.neighborFloors} VG Bestand.`;
+      $('ruleNote').innerHTML = `<strong>Rasterlogik:</strong> ${layout.coreCells} Kernmodule bleiben geschossweise fluchtend. Oberhalb des 2. OG wird die Hofkante um ${p.setback} m zurückgesetzt (ab 3. OG). Straße ${p.streetWidth} m. <strong>${darkText}.</strong><br><strong>Stadtraum:</strong> ${heightNote}`;
+      updateDevelopmentDashboard(layout);
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. Canvas-Grundriss: aus exakt denselben Zellen wie das 3D-Modell
+    // -------------------------------------------------------------------------
+    function drawPlan(layout) {
+      const canvas = $('planCanvas');
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const floor = layout.floors[Math.min(selectedFloorLevel, layout.floors.length - 1)];
+      const cellSize = Math.max(12, Math.min((rect.width - 116) / layout.cols, (rect.height - 26) / Math.max(layout.rows, 4)));
+      const planW = layout.cols * cellSize;
+      const planH = Math.max(layout.rows, 4) * cellSize;
+      const originX = Math.max(62, (rect.width - planW) / 2);
+      const originY = Math.max(10, (rect.height - planH) / 2);
+      const colors = {
+        residential: '#dce9e5', commercial: '#f1dfcf', dark: '#e5e8eb', core: '#cbd7df', access: '#c8dce8'
+      };
+
+      // Hof- und Straßenband als Orientierung.
+      ctx.fillStyle = 'rgba(107,139,128,.09)';
+      ctx.fillRect(originX, originY + planH + 3, planW, 5);
+      ctx.fillStyle = 'rgba(79,129,158,.08)';
+      ctx.fillRect(originX, originY - 8, planW, 5);
+      ctx.fillStyle = '#6d7c85';
+      ctx.font = '700 8px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('STRASSE', 8, originY + 5);
+      ctx.fillText('HOF', 8, originY + planH - 1);
+
+      // Module füllen und Raumstempel zeichnen.
+      for (const cell of floor.cells) {
+        const x = originX + cell.x * cellSize;
+        const y = originY + cell.y * cellSize;
+        ctx.fillStyle = colors[cell.type === 'rentable' ? cell.use : cell.type];
+        ctx.fillRect(x + .7, y + .7, cellSize - 1.4, cellSize - 1.4);
+        ctx.strokeStyle = 'rgba(52,72,83,.22)';
+        ctx.lineWidth = .75;
+        ctx.strokeRect(x + .35, y + .35, cellSize - .7, cellSize - .7);
+
+        if (cell.type === 'core') {
+          ctx.save();
+          ctx.strokeStyle = '#617987'; ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(x + 4, y + 4); ctx.lineTo(x + cellSize - 4, y + cellSize - 4);
+          ctx.moveTo(x + cellSize - 4, y + 4); ctx.lineTo(x + 4, y + cellSize - 4);
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          const stamp = cell.type === 'access' ? (cell.y === 0 ? 'EINGANG' : 'FLUR') : cell.type === 'dark' ? (cell.y % 2 === 0 ? 'FLUR' : 'BAD/KÜ') : (cell.use === 'commercial' ? 'GEWERBE' : 'WOHNEN');
+          const fontSize = Math.max(6, Math.min(9, cellSize * .19));
+          ctx.fillStyle = cell.type === 'dark' ? '#77838a' : (cell.use === 'commercial' ? '#8d6348' : '#4e6f6c');
+          ctx.font = `750 ${fontSize}px system-ui, sans-serif`;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(stamp, x + cellSize / 2, y + cellSize / 2, cellSize - 3);
+        }
+      }
+
+      // Kernbeschriftung mittig über den beiden Kernmodulen.
+      const coreX = originX + cellSize / 2;
+      const coreY = originY + (layout.coreRows[0] + 1) * cellSize;
+      ctx.fillStyle = '#435c6b';
+      ctx.font = `800 ${Math.max(7, Math.min(9, cellSize * .2))}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('TGA', coreX, coreY, cellSize - 2);
+
+      // Fensterbänder ausschließlich an Straße und Hof.
+      ctx.strokeStyle = '#4d9ac0'; ctx.lineWidth = 2.3; ctx.lineCap = 'round';
+      for (const cell of floor.cells) {
+        if (cell.type === 'core') continue;
+        if ((cell.y === 0 || cell.y === floor.activeRows - 1) && !(floor.level === 0 && cell.x === 0 && cell.y === 0)) {
+          const x = originX + cell.x * cellSize + cellSize * .17;
+          const y = originY + cell.y * cellSize + (cell.y === 0 ? 1.5 : cellSize - 1.5);
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + cellSize * .66, y); ctx.stroke();
+        }
+      }
+
+      // Wohnungsschotten: vertikale Trennwände nach jeweils zwei 3-m-Modulen.
+      ctx.strokeStyle = '#42545e'; ctx.lineWidth = 2.6; ctx.lineCap = 'square';
+      for (let xGrid = 2; xGrid < layout.cols; xGrid += 2) {
+        for (let yGrid = 0; yGrid < floor.activeRows; yGrid++) {
+          const left = floor.cellMap.get(keyOf(xGrid - 1, yGrid));
+          const right = floor.cellMap.get(keyOf(xGrid, yGrid));
+          if (left && right && left.type === 'rentable' && right.type === 'rentable' && left.use === 'residential' && right.use === 'residential') {
+            const x = originX + xGrid * cellSize;
+            const y = originY + yGrid * cellSize + 2;
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + cellSize - 4); ctx.stroke();
+          }
+        }
+      }
+
+      // Außenwand / Brandwände mit stärkerer Strichstärke.
+      ctx.strokeStyle = '#283b46'; ctx.lineWidth = 2.8;
+      ctx.strokeRect(originX, originY, planW, floor.activeRows * cellSize);
+      if (floor.level === 0) {
+        const accessDepth = layout.coreRows[0] * cellSize;
+        if (accessDepth > 0) {
+          ctx.beginPath(); ctx.moveTo(originX + cellSize, originY); ctx.lineTo(originX + cellSize, originY + accessDepth); ctx.stroke();
+        }
+      }
+
+      // EG-Eingang: Öffnung in der Straßenfassade und Pfeil entlang des Flurs zum Kern.
+      if (floor.level === 0) {
+        const doorX = originX + cellSize * .5;
+        ctx.fillStyle = '#f8fbfc';
+        ctx.fillRect(doorX - cellSize * .25, originY - 2.6, cellSize * .5, 5.2);
+        ctx.strokeStyle = '#315c70'; ctx.lineWidth = 1.7;
+        ctx.beginPath(); ctx.moveTo(doorX - cellSize * .24, originY); ctx.lineTo(doorX - cellSize * .24, originY + cellSize * .28);
+        ctx.lineTo(doorX, originY + cellSize * .28); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(doorX + cellSize * .24, originY); ctx.lineTo(doorX + cellSize * .24, originY + cellSize * .28);
+        ctx.lineTo(doorX, originY + cellSize * .28); ctx.stroke();
+        ctx.fillStyle = '#315c70'; ctx.font = '800 7px system-ui, sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText('EINGANG', originX + cellSize + 4, originY + 7);
+        ctx.strokeStyle = '#315c70'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(doorX, originY + cellSize * .42); ctx.lineTo(doorX, originY + cellSize * .76);
+        ctx.moveTo(doorX - 3, originY + cellSize * .68); ctx.lineTo(doorX, originY + cellSize * .76); ctx.lineTo(doorX + 3, originY + cellSize * .68); ctx.stroke();
+      }
+
+      // Maßstabsbalken.
+      ctx.strokeStyle = '#667780'; ctx.lineWidth = 1.5;
+      const scaleY = Math.min(rect.height - 8, originY + floor.activeRows * cellSize + 14);
+      ctx.beginPath(); ctx.moveTo(originX, scaleY); ctx.lineTo(originX + cellSize, scaleY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(originX, scaleY - 3); ctx.lineTo(originX, scaleY + 3); ctx.moveTo(originX + cellSize, scaleY - 3); ctx.lineTo(originX + cellSize, scaleY + 3); ctx.stroke();
+      ctx.fillStyle = '#78868e'; ctx.font = '8px system-ui, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('3 m', originX + cellSize + 5, scaleY + 3);
+      const label = floor.level === 0 ? 'EG' : `${floor.level}. OG`;
+      $('planTitle').textContent = `03 / Geschossplan · ${label}`;
+      $('planMeta').textContent = `${layout.cols} × ${floor.activeRows} Rastermodule · ${fmt0.format(floor.cells.length * MODULE_AREA)} m² BGF`;
+      $('planCanvas').setAttribute('aria-label', `Generierter Grundriss ${label}`);
+      $('planFootLabel').innerHTML = floor.level === 0
+        ? '<strong>STRASSE</strong> ↑ vorne · Eingang führt direkt in den Flur / Kern · EG ohne Balkone'
+        : '<strong>STRASSE</strong> ↑ vorne · blaue Linien = Belichtungsöffnungen · kräftige Linien = Wohnungsschotten';
+    }
+
+    function floorLabel(level) { return level === 0 ? 'EG' : `${level}. OG`; }
+
+    function renderFloorNavigation(layout) {
+      const nav = $('floorNav');
+      nav.innerHTML = '<span class="floor-nav-label">Geschoss</span>';
+      layout.floors.forEach((floor) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `floor-btn${floor.level === selectedFloorLevel ? ' active' : ''}`;
+        button.textContent = floorLabel(floor.level);
+        button.setAttribute('aria-pressed', String(floor.level === selectedFloorLevel));
+        button.setAttribute('aria-label', `Grundriss ${floorLabel(floor.level)} anzeigen`);
+        button.addEventListener('click', () => selectFloor(floor.level));
+        nav.appendChild(button);
+      });
+    }
+
+    function selectFloor(level) {
+      if (!latestLayout) return;
+      selectedFloorLevel = Math.max(0, Math.min(latestLayout.floors.length - 1, Number(level) || 0));
+      renderFloorNavigation(latestLayout);
+      drawPlan(latestLayout);
+      const layers = modelRoot?.getObjectByName('FloorSelectionLayers');
+      if (layers) layers.children.forEach((layer) => { layer.visible = layer.userData.level === selectedFloorLevel; });
+      if (controls) {
+        controls.target.y = selectedFloorLevel * FLOOR_HEIGHT + FLOOR_HEIGHT * .5;
+        controls.update();
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Three.js-Helfer und prozedurale Materialien
+    // -------------------------------------------------------------------------
+    function makeBox(parent, width, height, depth, material, x, y, z, options = {}) {
+      const geometry = new THREE.BoxGeometry(width, height, depth);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = options.castShadow !== false;
+      mesh.receiveShadow = options.receiveShadow !== false;
+      if (options.name) mesh.name = options.name;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function makeBrickTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#a9654c'; ctx.fillRect(0, 0, c.width, c.height);
+      const courseH = 28;
+      for (let row = 0; row < 10; row++) {
+        const y = row * courseH;
+        ctx.fillStyle = 'rgba(245,211,185,.32)'; ctx.fillRect(0, y, c.width, 2);
+        const offset = row % 2 ? -34 : 0;
+        for (let x = offset; x < c.width; x += 68) {
+          ctx.fillRect(x, y + 2, 2, courseH - 2);
+        }
+      }
+      // Dezente Tonvariation für eine nicht uniforme Klinkeroberfläche.
+      for (let i = 0; i < 170; i++) {
+        ctx.fillStyle = i % 2 ? 'rgba(72,37,27,.045)' : 'rgba(255,230,208,.055)';
+        const x = (i * 71) % c.width; const y = (i * 37) % c.height;
+        ctx.fillRect(x, y, 26, 12);
+      }
+      const texture = new THREE.CanvasTexture(c);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1, 1);
+      return texture;
+    }
+
+    function createMaterials(quality) {
+      const standard = STANDARD[quality];
+      const brickTexture = quality === 'medium' ? makeBrickTexture() : null;
+      const wallColor = quality === 'basic' ? 0xd8d4ca : quality === 'medium' ? 0xffffff : 0x354a57;
+      const wall = new THREE.MeshStandardMaterial({
+        color: wallColor, map: brickTexture, roughness: quality === 'medium' ? .92 : .86,
+        metalness: quality === 'premium' ? .16 : .02
+      });
+      const concrete = new THREE.MeshStandardMaterial({ color: 0x9ca8ad, roughness: .92, metalness: .03 });
+      const core = new THREE.MeshStandardMaterial({ color: 0x697b84, roughness: .88, metalness: .08 });
+      const slab = new THREE.MeshStandardMaterial({ color: 0xd6dcdd, roughness: .88, metalness: .02 });
+      const darkFrame = new THREE.MeshStandardMaterial({ color: 0x344750, roughness: .46, metalness: .58 });
+      const lightFrame = new THREE.MeshStandardMaterial({ color: 0xc4c8c5, roughness: .42, metalness: .48 });
+      const glass = new THREE.MeshPhysicalMaterial({
+        color: quality === 'premium' ? 0x8db9c7 : 0x7098a7,
+        roughness: quality === 'premium' ? .16 : .25,
+        metalness: .12, transmission: .16, transparent: true, opacity: .86,
+        clearcoat: .55, clearcoatRoughness: .18, side: THREE.DoubleSide
+      });
+      const balcony = new THREE.MeshStandardMaterial({ color: 0x536973, roughness: .42, metalness: .65 });
+      const ground = new THREE.MeshStandardMaterial({ color: 0xd4d9d4, roughness: 1 });
+      const road = new THREE.MeshStandardMaterial({ color: 0x7b858a, roughness: 1 });
+      const green = new THREE.MeshStandardMaterial({ color: 0x98aa99, roughness: 1 });
+      const accent = new THREE.MeshStandardMaterial({ color: 0x789c9b, roughness: .66, metalness: .15 });
+      return { wall, concrete, core, slab, darkFrame, lightFrame, glass, balcony, ground, road, green, accent, brickTexture };
+    }
+
+    function addFacadePanel(parent, x, yBottom, zSurface, facing, quality, mats) {
+      const sign = facing === 'front' ? -1 : 1;
+      const z = zSurface;
+      if (quality === 'premium') {
+        // Nahezu vollflächige Curtain-Wall mit schlanken Profilen.
+        makeBox(parent, 2.88, 2.88, .075, mats.glass, x, yBottom + 1.5, z - sign * .045);
+        makeBox(parent, .075, 2.96, .12, mats.darkFrame, x - 1.46, yBottom + 1.5, z);
+        makeBox(parent, .075, 2.96, .12, mats.darkFrame, x + 1.46, yBottom + 1.5, z);
+        makeBox(parent, 2.96, .075, .12, mats.darkFrame, x, yBottom + .05, z);
+        makeBox(parent, 2.96, .075, .12, mats.darkFrame, x, yBottom + 2.95, z);
+        makeBox(parent, .035, 2.82, .13, mats.lightFrame, x, yBottom + 1.5, z - sign * .05);
+        makeBox(parent, 2.84, .035, .13, mats.lightFrame, x, yBottom + 1.5, z - sign * .05);
+        return;
+      }
+
+      const isMedium = quality === 'medium';
+      const openingW = isMedium ? 2.2 : 1.45;
+      const openingH = isMedium ? 2.25 : 1.28;
+      const sillH = isMedium ? .34 : .76;
+      const lintelH = FLOOR_HEIGHT - sillH - openingH;
+      const pierW = (MODULE - openingW) / 2;
+      const material = mats.wall;
+      const thickness = .14;
+      makeBox(parent, pierW, FLOOR_HEIGHT, thickness, material, x - openingW / 2 - pierW / 2, yBottom + 1.5, z);
+      makeBox(parent, pierW, FLOOR_HEIGHT, thickness, material, x + openingW / 2 + pierW / 2, yBottom + 1.5, z);
+      makeBox(parent, openingW, sillH, thickness, material, x, yBottom + sillH / 2, z);
+      makeBox(parent, openingW, lintelH, thickness, material, x, yBottom + sillH + openingH + lintelH / 2, z);
+      makeBox(parent, openingW, openingH, .055, mats.glass, x, yBottom + sillH + openingH / 2, z - sign * .055);
+
+      const frame = isMedium ? mats.darkFrame : mats.lightFrame;
+      const frameT = isMedium ? .065 : .045;
+      makeBox(parent, frameT, openingH + .06, .10, frame, x - openingW / 2, yBottom + sillH + openingH / 2, z - sign * .09);
+      makeBox(parent, frameT, openingH + .06, .10, frame, x + openingW / 2, yBottom + sillH + openingH / 2, z - sign * .09);
+      makeBox(parent, openingW + .06, frameT, .10, frame, x, yBottom + sillH, z - sign * .09);
+      makeBox(parent, openingW + .06, frameT, .10, frame, x, yBottom + sillH + openingH, z - sign * .09);
+      if (isMedium) {
+        makeBox(parent, .045, openingH, .09, mats.lightFrame, x, yBottom + sillH + openingH / 2, z - sign * .10);
+      }
+    }
+
+    function addEntranceDoor(parent, x, yBottom, zSurface, mats) {
+      const sign = -1; // Straße liegt auf der negativen Z-Seite.
+      const doorWidth = 1.72;
+      const doorHeight = 2.34;
+      const pierWidth = (2.96 - doorWidth) / 2;
+      const doorY = yBottom + doorHeight / 2 + .08;
+      makeBox(parent, pierWidth, 2.92, .15, mats.wall, x - doorWidth / 2 - pierWidth / 2, yBottom + 1.59, zSurface, { name: 'Eingang_Seitenwand_links' });
+      makeBox(parent, pierWidth, 2.92, .15, mats.wall, x + doorWidth / 2 + pierWidth / 2, yBottom + 1.59, zSurface, { name: 'Eingang_Seitenwand_rechts' });
+      makeBox(parent, doorWidth + .08, .46, .16, mats.wall, x, yBottom + 2.70, zSurface, { name: 'Eingang_Sturz' });
+      makeBox(parent, doorWidth, doorHeight, .065, mats.glass, x, doorY, zSurface - .055, { name: 'Eingang_Glastür' });
+      for (const edge of [-1, 1]) {
+        makeBox(parent, .065, doorHeight + .08, .12, mats.darkFrame, x + edge * doorWidth / 2, doorY, zSurface - .10);
+      }
+      makeBox(parent, .065, doorHeight + .08, .12, mats.darkFrame, x, doorY, zSurface - .105);
+      makeBox(parent, .035, .28, .045, mats.balcony, x + .58, doorY, zSurface - .18, { name: 'Türgriff' });
+      makeBox(parent, 2.35, .12, .82, mats.concrete, x, yBottom + 2.48, zSurface - .40, { name: 'Eingangsvordach' });
+      makeBox(parent, 2.30, .10, 1.0, mats.concrete, x, yBottom + .05, zSurface - .52, { name: 'Eingangsschwelle' });
+    }
+
+    function addBalcony(parent, x, yBottom, zSurface, facing, mats) {
+      const sign = facing === 'front' ? -1 : 1;
+      const outerZ = zSurface + sign * 1.03;
+      const width = 2.55;
+      // Auskragende Balkonplatte mit filigranem Stabgeländer.
+      makeBox(parent, width, .13, 1.0, mats.concrete, x, yBottom + .13, zSurface + sign * .52);
+      makeBox(parent, width, .055, .055, mats.balcony, x, yBottom + 1.13, outerZ);
+      makeBox(parent, width, .055, .055, mats.balcony, x, yBottom + .18, outerZ);
+      for (let i = 0; i <= 6; i++) {
+        const px = x - width / 2 + i * width / 6;
+        makeBox(parent, .035, .95, .035, mats.balcony, px, yBottom + .65, outerZ);
+      }
+      for (const edge of [-1, 1]) {
+        makeBox(parent, .055, .95, 1.0, mats.balcony, x + edge * width / 2, yBottom + .65, zSurface + sign * .52);
+      }
+    }
+
+    function addTextSprite(parent, text, position, color = '#41535d') {
+      // Als texturierte Plane statt Sprite ausgeführt: bleibt im glTF-Export erhalten.
+      const canvas = document.createElement('canvas');
+      canvas.width = 512; canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = '800 48px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round'; ctx.lineWidth = 8;
+      ctx.strokeStyle = 'rgba(248,250,248,.92)';
+      ctx.strokeText(text, 256, 64);
+      ctx.fillStyle = color;
+      ctx.fillText(text, 256, 64);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(6.2, 1.55), material);
+      plane.rotation.x = -Math.PI / 2;
+      plane.position.set(...position);
+      plane.renderOrder = 3;
+      plane.userData.proceduralLabel = true;
+      parent.add(plane);
+      return plane;
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. Parametrische 3D-Generierung
+    // -------------------------------------------------------------------------
+    function buildModel(layout) {
+      const p = layout.params;
+      const group = new THREE.Group();
+      group.name = 'Carbon to Silicon — 3m voxel building';
+      const mats = createMaterials(p.quality);
+      const halfW = p.width / 2;
+      const halfD = p.depth / 2;
+      const totalHeight = p.floors * FLOOR_HEIGHT;
+      const levelMaps = layout.floors.map(f => f.cellMap);
+
+      // Grundstück / Stadtraum.
+      const streetCenter = -halfD - p.streetWidth / 2;
+      makeBox(group, p.width + 36, .32, p.depth + p.streetWidth + 28, mats.ground, 0, -.47, 0, { castShadow: false });
+      makeBox(group, p.width + 36, .12, p.streetWidth, mats.road, 0, -.24, streetCenter, { castShadow: false });
+      makeBox(group, p.width + 36, .10, 6.0, mats.green, 0, -.25, halfD + 8.0, { castShadow: false });
+      // Dezente Straßenmarkierung; Straßenbreite folgt dem Kontextparameter.
+      const marking = new THREE.MeshStandardMaterial({ color: 0xe8e4d7, roughness: 1 });
+      for (let x = -p.width / 2 - 12; x < p.width / 2 + 12; x += 6) {
+        makeBox(group, 2.2, .018, .10, marking, x, -.17, streetCenter, { castShadow: false, receiveShadow: false });
+      }
+      // Rückwärtiger Hof als ruhige Freifläche.
+      for (let i = 0; i < 5; i++) {
+        const tx = -p.width / 2 + 2 + i * Math.max(2.2, p.width / 5);
+        makeBox(group, .7, .5, .7, mats.accent, tx, .04, halfD + 7.0 + (i % 2) * .8, { castShadow: true });
+      }
+
+      // Bodenplatten je belegter 3 × 3-m-Zelle.
+      for (const floor of layout.floors) {
+        for (const cell of floor.cells) {
+          const x = -halfW + (cell.x + .5) * MODULE;
+          const z = -halfD + (cell.y + .5) * MODULE;
+          const yBottom = cell.level * FLOOR_HEIGHT;
+          // Jede Geschossdecke liegt als durchgehende 3-m-Modulplatte auf; die Decke eines Geschosses ist zugleich der Fußboden des darüberliegenden.
+          makeBox(group, MODULE, .24, MODULE, mats.slab, x, yBottom + .12, z, { name: `Geschossdecke_L${cell.level}_X${cell.x}_Y${cell.y}` });
+
+          // Außenseiten der Zellen werden als Fassaden-/Brandwandmodule aufgebaut.
+          const map = floor.cellMap;
+          if (cell.level === 0 && cell.type === 'access') {
+            // Seitliche Flurwand: der Eingangskorridor bleibt als eigene Erschließungszone lesbar.
+            makeBox(group, .12, 2.92, 2.98, mats.wall, x + 1.44, yBottom + 1.59, z, { name: 'EG_Flurwand_zum_Gewerbe' });
+          }
+          if (!map.has(keyOf(cell.x - 1, cell.y))) {
+            makeBox(group, .14, 2.92, 2.98, mats.wall, x - 1.43, yBottom + 1.59, z, { name: `Brandwand_L${cell.level}_links` });
+          }
+          if (!map.has(keyOf(cell.x + 1, cell.y))) {
+            makeBox(group, .14, 2.92, 2.98, mats.wall, x + 1.43, yBottom + 1.59, z, { name: `Brandwand_L${cell.level}_rechts` });
+          }
+          if (!map.has(keyOf(cell.x, cell.y - 1))) {
+            if (cell.level === 0 && cell.x === 0 && cell.y === 0) {
+              addEntranceDoor(group, x, yBottom, z - 1.48, mats);
+            } else {
+              addFacadePanel(group, x, yBottom, z - 1.48, 'front', p.quality, mats);
+            }
+            // Das EG bleibt bewusst balkonfrei; Balkone beginnen ab dem 1. OG.
+            if (cell.level > 0 && p.quality === 'medium' && cell.type !== 'core') addBalcony(group, x, yBottom, z - 1.48, 'front', mats);
+          }
+          if (!map.has(keyOf(cell.x, cell.y + 1))) {
+            addFacadePanel(group, x, yBottom, z + 1.48, 'rear', p.quality, mats);
+            if (cell.level > 0 && p.quality === 'medium' && cell.type !== 'core') addBalcony(group, x, yBottom, z + 1.48, 'rear', mats);
+          }
+        }
+      }
+
+      // Der massive Kern steht als vertikaler 3 × 6-m-Körper von EG bis Dach.
+      const coreZ = -halfD + (layout.coreRows[0] + 1) * MODULE;
+      const coreX = -halfW + MODULE / 2;
+      makeBox(group, 3.0, totalHeight, 6.0, mats.core, coreX, totalHeight / 2, coreZ, { name: 'TGA-Kern_3x6m_EG_bis_Dach' });
+      // Vertikale Schachtkanten und ein zurückhaltender Dachabschluss machen den Kern lesbar.
+      for (const dx of [-1.47, 1.47]) {
+        makeBox(group, .06, totalHeight + .12, 6.0, mats.darkFrame, coreX + dx, totalHeight / 2, coreZ, { name: 'TGA-Kern-Kante' });
+      }
+      makeBox(group, 3.0, .22, 6.0, mats.concrete, coreX, totalHeight + .08, coreZ, { name: 'TGA-Kopfausbildung' });
+
+      // Dachkante / Attika je tatsächlich belegter oberster Zelle.
+      const topFloor = layout.floors[layout.floors.length - 1];
+      for (const cell of topFloor.cells) {
+        const x = -halfW + (cell.x + .5) * MODULE;
+        const z = -halfD + (cell.y + .5) * MODULE;
+        makeBox(group, MODULE, .16, MODULE, mats.concrete, x, totalHeight + .02, z, { name: 'Dachabschluss' });
+      }
+
+      // Die drei Entwurfsqualitäten unterscheiden sich über die Fassadenmodule;
+      // Geschossfugen werden nicht als durchlaufende Vollplatten modelliert, damit
+      // Rücksprünge keine scheinbar schwebenden Bauteile erzeugen.
+
+      // Auswahl-Layer: das gerade betrachtete Geschoss wird im 3D-Modell dezent cyan markiert.
+      const selectionLayers = new THREE.Group();
+      selectionLayers.name = 'FloorSelectionLayers';
+      const selectionMaterial = new THREE.MeshBasicMaterial({ color: 0x55a6c8, transparent: true, opacity: .22, depthWrite: false });
+      for (const floor of layout.floors) {
+        const levelLayer = new THREE.Group();
+        levelLayer.name = `FloorSelection_${floor.level}`;
+        levelLayer.userData.level = floor.level;
+        levelLayer.visible = floor.level === selectedFloorLevel;
+        for (const cell of floor.cells) {
+          const x = -halfW + (cell.x + .5) * MODULE;
+          const z = -halfD + (cell.y + .5) * MODULE;
+          makeBox(levelLayer, MODULE * .94, .028, MODULE * .94, selectionMaterial, x, floor.level * FLOOR_HEIGHT + .27, z, { castShadow: false, receiveShadow: false });
+        }
+        selectionLayers.add(levelLayer);
+      }
+      group.add(selectionLayers);
+
+      // Orientierung im Stadtraum, als prozedural erzeugte Textur-Sprites.
+      addTextSprite(group, `STRASSE  /  ${p.streetWidth} m`, [0, .04, -halfD - p.streetWidth / 2], '#475b65');
+      addTextSprite(group, 'INNENHOF', [0, .04, halfD + 11.1], '#536e62');
+
+      // Materials/Textures werden am group-Objekt gesammelt, damit Rebuild sauber entsorgen kann.
+      group.userData.generatedMaterials = [...Object.values(mats).filter(v => v && v.isMaterial), marking, selectionMaterial];
+      group.userData.generatedTextures = [mats.brickTexture].filter(Boolean);
+      return group;
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. Städtebaulicher Kontext: schematische Nachbarvolumen (nicht im Gebäudeexport)
+    // -------------------------------------------------------------------------
+    function buildUrbanContext(layout) {
+      const p = layout.params;
+      const root = new THREE.Group();
+      root.name = 'Städtebaulicher Kontext · schematische Blockrandbebauung';
+      const massMat = new THREE.MeshStandardMaterial({ color: 0xc1c9c9, roughness: .96 });
+      const sideMat = new THREE.MeshStandardMaterial({ color: 0xaeb9ba, roughness: .98 });
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0x9ca9aa, roughness: 1 });
+      const windowMat = new THREE.MeshStandardMaterial({ color: 0x647e89, roughness: .48, metalness: .08 });
+      const sillMat = new THREE.MeshStandardMaterial({ color: 0xd8ddda, roughness: .9 });
+      const pavingMat = new THREE.MeshStandardMaterial({ color: 0xd5dcd8, roughness: 1 });
+      const greenMat = new THREE.MeshStandardMaterial({ color: 0x9eae9c, roughness: 1 });
+      const h = p.neighborFloors * FLOOR_HEIGHT;
+      const halfW = p.width / 2;
+      const halfD = p.depth / 2;
+      const roadHalf = p.streetWidth / 2;
+      const streetFrontZ = -halfD;
+      const streetBackZ = streetFrontZ - p.streetWidth;
+      const contextWidth = p.width + 18; // Grundstück plus je 9 m Nachbarparzelle
+      const neighborLot = 9;
+      const sideDepth = p.depth; // bündig an Straßen- und Hofkante des Projektgrundstücks
+      const courtClear = 12; // schematischer freier Hofraum zwischen den Blockkanten
+      const oppositeDepth = 9;
+      const rearDepth = 9;
+
+      function block(name, width, height, depth, x, z, material) {
+        return makeBox(root, width, height, depth, material, x, height / 2, z,
+          { name, castShadow: true, receiveShadow: true });
+      }
+      function facadeWindows({x0, x1, z, levels, bays, direction = 1, sill = true}) {
+        const span = x1 - x0;
+        for (let level = 0; level < levels; level++) {
+          for (let bay = 0; bay < bays; bay++) {
+            const x = x0 + (bay + .5) * span / bays;
+            const y = level * FLOOR_HEIGHT + 1.62;
+            const w = Math.min(1.35, span / bays * .46);
+            makeBox(root, w, 1.08, .07, windowMat, x, y, z + direction * .045, {castShadow:false});
+            if (sill) makeBox(root, w + .18, .09, .13, sillMat, x, y - .59, z + direction * .055, {castShadow:false});
+          }
+        }
+      }
+      function sideWindows({x, z0, z1, levels, bays, direction}) {
+        const span = z1 - z0;
+        for (let level = 0; level < levels; level++) for (let bay = 0; bay < bays; bay++) {
+          const z = z0 + (bay + .5) * span / bays;
+          const y = level * FLOOR_HEIGHT + 1.62;
+          makeBox(root, .07, 1.08, Math.min(1.35, span / bays * .46), windowMat, x + direction * .045, y, z, {castShadow:false});
+        }
+      }
+      function label(text, x, z) {
+        addTextSprite(root, text, [x, .04, z], '#697980');
+      }
+
+      // 1) Benachbarte Parzellen links/rechts: gleiche Straßen- und Hofkante wie die Baulücke.
+      // Die zum Projekt gerichteten Brandwände bleiben geschlossen und fensterlos.
+      const leftX = -halfW - neighborLot / 2;
+      const rightX = halfW + neighborLot / 2;
+      block('Nachbar links · geschlossene Brandwand', neighborLot, h, sideDepth, leftX, 0, sideMat);
+      block('Nachbar rechts · geschlossene Brandwand', neighborLot, h, sideDepth, rightX, 0, massMat);
+      // Straßenfassaden der Seitenhäuser liegen exakt auf der vorderen Grundstücksflucht.
+      facadeWindows({x0:leftX-neighborLot/2+.35, x1:leftX+neighborLot/2-.35, z:streetFrontZ, levels:p.neighborFloors, bays:2, direction:-1});
+      facadeWindows({x0:rightX-neighborLot/2+.35, x1:rightX+neighborLot/2-.35, z:streetFrontZ, levels:p.neighborFloors, bays:2, direction:-1});
+      // Hofseitige Fassaden der Nachbarn; die Brandwand zum Projekt bleibt ohne Öffnungen.
+      facadeWindows({x0:leftX-neighborLot/2+.35, x1:leftX+neighborLot/2-.35, z:halfD, levels:p.neighborFloors, bays:2, direction:1});
+      facadeWindows({x0:rightX-neighborLot/2+.35, x1:rightX+neighborLot/2-.35, z:halfD, levels:p.neighborFloors, bays:2, direction:1});
+      // Äußere Seitenfassaden erhalten Öffnungen; innere Seitenwände sind Brandwände.
+      sideWindows({x:leftX-neighborLot/2, z0:-halfD+1, z1:halfD-1, levels:p.neighborFloors, bays:Math.max(2,Math.floor(p.depth/6)), direction:-1});
+      sideWindows({x:rightX+neighborLot/2, z0:-halfD+1, z1:halfD-1, levels:p.neighborFloors, bays:Math.max(2,Math.floor(p.depth/6)), direction:1});
+
+      // 2) Gegenüberliegender Blockrand: exakt um die eingestellte Straßenbreite versetzt.
+      const oppositeZ = streetBackZ - oppositeDepth / 2;
+      block('Gegenüberliegender Blockrand · Straßenkante', contextWidth, h, oppositeDepth, 0, oppositeZ, massMat);
+      const oppositeFront = streetBackZ;
+      facadeWindows({x0:-contextWidth/2+.45, x1:contextWidth/2-.45, z:oppositeFront, levels:p.neighborFloors, bays:Math.max(3,Math.round(contextWidth/3)), direction:-1});
+      // Dezente Dachkante / Attika als lesbare Blockfigur.
+      block('Attika gegenüber', contextWidth, .28, oppositeDepth+.08, 0, oppositeZ, roofMat).position.y = h + .14;
+
+      // 3) Rückwärtiger Hof: freier Hofraum bleibt tatsächlich frei; Nachbarbebauung erst dahinter.
+      const courtStart = halfD;
+      const rearFront = courtStart + courtClear;
+      const rearZ = rearFront + rearDepth/2;
+      const rearFloors = Math.max(3, Math.min(4, p.neighborFloors));
+      const rearH = rearFloors * FLOOR_HEIGHT;
+      // Hofboden / Grüninseln im freien Abstand, ohne den Lichtkorridor zu verstellen.
+      makeBox(root, contextWidth, .08, courtClear, pavingMat, 0, -.25, courtStart + courtClear/2, {castShadow:false, receiveShadow:true, name:'Hofraum · freie Belichtungszone'});
+      for (const gx of [-contextWidth/2+2, contextWidth/2-2]) {
+        makeBox(root, 2.2, .12, 3.2, greenMat, gx, -.19, courtStart + courtClear/2, {castShadow:false, name:'Hofgrün'});
+      }
+      block('Rückwärtiger Blockrand · Hofabschluss', contextWidth, rearH, rearDepth, 0, rearZ, sideMat);
+      facadeWindows({x0:-contextWidth/2+.45, x1:contextWidth/2-.45, z:rearFront, levels:rearFloors, bays:Math.max(3,Math.round(contextWidth/3)), direction:1});
+      block('Attika Hofabschluss', contextWidth, .28, rearDepth+.08, 0, rearZ, roofMat).position.y = rearH + .14;
+
+      // 4) Gehwege beidseitig; die Straßenfahrbahn selbst wird bereits vom Grundstücksmodell erzeugt.
+      for (const side of [-1,1]) makeBox(root, 2.0, .12, p.streetWidth, pavingMat, side*(contextWidth/2+5), -.16, streetFrontZ-p.streetWidth/2, {castShadow:false});
+
+      label(`NACHBAR LINKS · ${p.neighborFloors} VG`, leftX, streetFrontZ-3.5);
+      label(`GEGENÜBER · ${p.streetWidth} m STRASSE`, 0, streetBackZ-oppositeDepth-2.0);
+      label(`HOFRAUM · ${courtClear} m (SCHEMATISCH)`, 0, courtStart+courtClear/2);
+      label(`HOFABSCHLUSS · ${rearFloors} VG`, 0, rearFront+rearDepth+2.0);
+      root.userData.generatedMaterials = [massMat,sideMat,roofMat,windowMat,sillMat,pavingMat,greenMat];
+      return root;
+    }
+
+    // -------------------------------------------------------------------------
+    // 8. Szene, Kamera, Controls und Renderloop
+    // -------------------------------------------------------------------------
+    // Kleine OrbitControls-kompatible Implementierung ohne ES-Module-Abhängigkeit.
+    // Dadurch sind Rotation, Zoom und Touch auch beim Start über file:// möglich.
+    class LocalOrbitControls {
+      constructor(camera, element) {
+        this.object = camera; this.domElement = element; this.target = new THREE.Vector3(0, 7.5, 0);
+        this.enableDamping = true; this.dampingFactor = .085; this.minDistance = 10; this.maxDistance = 120;
+        this.maxPolarAngle = Math.PI * .49; this.minPolarAngle = .08;
+        this.rotateSpeed = .006; this.zoomSpeed = 1.08;
+        this.spherical = new THREE.Spherical(); this.deltaTheta = 0; this.deltaPhi = 0; this.scale = 1;
+        this.pointer = null; this.dragging = false; this.panMode = false;
+        this._down = e => this.onPointerDown(e); this._move = e => this.onPointerMove(e); this._up = e => this.onPointerUp(e); this._wheel = e => this.onWheel(e);
+        element.addEventListener('pointerdown', this._down); window.addEventListener('pointermove', this._move); window.addEventListener('pointerup', this._up); element.addEventListener('wheel', this._wheel, { passive: false });
+        element.style.touchAction = 'none';
+      }
+      onPointerDown(e) { if (e.button !== 0 && e.button !== 2) return; this.dragging = true; this.panMode = e.button === 2; this.pointer = { x:e.clientX, y:e.clientY }; this.domElement.setPointerCapture?.(e.pointerId); }
+      onPointerMove(e) {
+        if (!this.dragging || !this.pointer) return;
+        const dx=e.clientX-this.pointer.x, dy=e.clientY-this.pointer.y; this.pointer={x:e.clientX,y:e.clientY};
+        if (this.panMode) {
+          const offset = new THREE.Vector3().subVectors(this.object.position, this.target);
+          const right = new THREE.Vector3().setFromMatrixColumn(this.object.matrix, 0);
+          const up = new THREE.Vector3().setFromMatrixColumn(this.object.matrix, 1);
+          const scale = Math.max(.004, offset.length() * .0018);
+          this.target.addScaledVector(right, -dx * scale).addScaledVector(up, dy * scale);
+        } else { this.deltaTheta -= dx * this.rotateSpeed; this.deltaPhi -= dy * this.rotateSpeed; }
+      }
+      onPointerUp() { this.dragging=false; this.pointer=null; }
+      onWheel(e) { e.preventDefault(); this.scale *= e.deltaY > 0 ? this.zoomSpeed : 1 / this.zoomSpeed; }
+      update() {
+        const offset = new THREE.Vector3().subVectors(this.object.position, this.target);
+        this.spherical.setFromVector3(offset);
+        this.spherical.theta += this.deltaTheta; this.spherical.phi += this.deltaPhi;
+        this.spherical.phi = Math.max(this.minPolarAngle, Math.min(this.maxPolarAngle, this.spherical.phi));
+        this.spherical.radius = Math.max(this.minDistance, Math.min(this.maxDistance, this.spherical.radius * this.scale));
+        this.object.position.setFromSpherical(this.spherical).add(this.target); this.object.lookAt(this.target);
+        if (this.enableDamping) { const k=1-this.dampingFactor; this.deltaTheta*=k; this.deltaPhi*=k; } else { this.deltaTheta=0; this.deltaPhi=0; }
+        this.scale=1;
+      }
+      resetDeltas() { this.deltaTheta=0; this.deltaPhi=0; this.scale=1; }
+      dispose() { this.domElement.removeEventListener('pointerdown',this._down); window.removeEventListener('pointermove',this._move); window.removeEventListener('pointerup',this._up); this.domElement.removeEventListener('wheel',this._wheel); }
+    }
+
+    function initThree() {
+      const host = $('viewport');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xe5ecef);
+      scene.fog = new THREE.Fog(0xe5ecef, 65, 155);
+
+      camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, .1, 350);
+      camera.position.set(31, 25, 34);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.14;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.domElement.setAttribute('aria-label', '3D-Modell — mit Maus drehen und zoomen');
+      host.appendChild(renderer.domElement);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x81909a, 2.05);
+      scene.add(hemi);
+      const key = new THREE.DirectionalLight(0xfff6e9, 3.0);
+      key.position.set(-25, 38, -20);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.left = -38; key.shadow.camera.right = 38;
+      key.shadow.camera.top = 38; key.shadow.camera.bottom = -38;
+      key.shadow.bias = -.0002;
+      scene.add(key);
+      const fill = new THREE.DirectionalLight(0xd8ecff, 1.15);
+      fill.position.set(24, 20, 26);
+      scene.add(fill);
+
+      controls = new (OrbitControlsImpl || LocalOrbitControls)(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = .065;
+      controls.minDistance = 12;
+      controls.maxDistance = 95;
+      controls.maxPolarAngle = Math.PI * .49;
+      controls.target.set(0, 7.5, 0);
+      controls.update();
+
+      resizeObserver = new ResizeObserver(() => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        if (latestLayout) drawPlan(latestLayout);
+      });
+      resizeObserver.observe(document.body);
+      window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        if (latestLayout) drawPlan(latestLayout);
+      }, { passive: true });
+
+      const render = () => {
+        animationFrame = requestAnimationFrame(render);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+      render();
+    }
+
+    function disposeGroup(group) {
+      if (!group) return;
+      if (scene) scene.remove(group);
+      group.traverse((obj) => {
+        if (obj.geometry) obj.geometry.dispose();
+        // Text-Planes und ihre Canvas-Texturen werden pro Rebuild neu erzeugt.
+        if (obj.userData.proceduralLabel && obj.material) {
+          if (obj.material.map) obj.material.map.dispose();
+          obj.material.dispose();
+        }
+        // Geteilte Mesh-Materialien werden unten genau einmal disposed.
+      });
+      for (const material of group.userData.generatedMaterials || []) material.dispose();
+      for (const texture of group.userData.generatedTextures || []) texture.dispose();
+    }
+
+    function fitCamera(layout) {
+      const p = layout.params;
+      const centerY = p.floors * FLOOR_HEIGHT * .43;
+      const radius = Math.max(p.width + 28, p.depth + p.streetWidth + 30, p.floors * FLOOR_HEIGHT);
+      controls.resetDeltas?.();
+      controls.target.set(0, centerY, 0);
+      camera.position.set(radius * 1.25, Math.max(16, p.floors * 2.8), radius * 1.42);
+      camera.near = .1;
+      camera.far = radius * 12 + 100;
+      camera.updateProjectionMatrix();
+      controls.minDistance = Math.max(9, radius * .36);
+      controls.maxDistance = radius * 4.2;
+      controls.update();
+    }
+
+    function rebuildAll(resetCamera = false) {
+      const p = readState();
+      syncControls(p);
+      const layout = generateLayout(p);
+      latestLayout = layout;
+      selectedFloorLevel = Math.max(0, Math.min(selectedFloorLevel, layout.floors.length - 1));
+      updateDashboard(layout);
+      renderFloorNavigation(layout);
+      drawPlan(layout);
+
+      const geometrySignature = `${p.width}/${p.depth}/${p.floors}/${p.setback}`;
+      const geometryChanged = geometrySignature !== previousGeometrySignature;
+      const nextRoot = buildModel(layout);
+      const nextContext = buildUrbanContext(layout);
+      if (modelRoot) disposeGroup(modelRoot);
+      if (contextRoot) disposeGroup(contextRoot);
+      modelRoot = nextRoot;
+      contextRoot = nextContext;
+      scene.add(modelRoot);
+      scene.add(contextRoot);
+      contextRoot.visible = $('contextToggle').dataset.visible !== 'false';
+      if (resetCamera || geometryChanged) fitCamera(layout);
+      const selectionLayers = modelRoot.getObjectByName('FloorSelectionLayers');
+      if (selectionLayers) selectionLayers.children.forEach((layer) => { layer.visible = layer.userData.level === selectedFloorLevel; });
+      previousGeometrySignature = geometrySignature;
+    }
+
+    // -------------------------------------------------------------------------
+    // 9. Export: eigenständiger glTF-2.0-Writer mit eingebettetem Binärbuffer
+    // -------------------------------------------------------------------------
+    function exportGLTF() {
+      if (!modelRoot || !THREE) { showToast('Das Modell ist noch nicht exportbereit.'); return; }
+      const button = $('exportBtn'); button.disabled = true; button.textContent = 'Export läuft …';
+      try {
+        const chunks = []; const bufferViews = []; const accessors = []; const meshes = []; const nodes = [];
+        const materials = []; const images = []; const textures = []; const materialMap = new Map(); const textureMap = new Map();
+        let byteLength = 0;
+        const align4 = () => { const pad=(4-byteLength%4)%4; if(pad){const a=new Uint8Array(pad);chunks.push(a);byteLength+=pad;} };
+        function addBytes(typed, target) {
+          align4(); const raw = new Uint8Array(typed.buffer.slice(typed.byteOffset, typed.byteOffset + typed.byteLength));
+          const viewIndex=bufferViews.length; bufferViews.push({ buffer:0, byteOffset:byteLength, byteLength:raw.byteLength, ...(target?{target}:{}) });
+          chunks.push(raw); byteLength+=raw.byteLength; return viewIndex;
+        }
+        function addAccessor(typed, componentType, type, count, target, min, max) {
+          const view=addBytes(typed,target); const a={bufferView:view,componentType,count,type}; if(min) a.min=min; if(max) a.max=max;
+          const index=accessors.length; accessors.push(a); return index;
+        }
+        function toBase64(uint8) {
+          let binary=''; const chunkSize=0x8000;
+          for(let i=0;i<uint8.length;i+=chunkSize) binary+=String.fromCharCode(...uint8.subarray(i,i+chunkSize));
+          return btoa(binary);
+        }
+        function getTexture(texture) {
+          if(!texture || !texture.image || typeof texture.image.toDataURL !== 'function') return null;
+          if(textureMap.has(texture.uuid)) return textureMap.get(texture.uuid);
+          try {
+            const dataUri=texture.image.toDataURL('image/png'); const imageIndex=images.length;
+            images.push({uri:dataUri,mimeType:'image/png'});
+            if(!textures.length) { /* sampler is attached below */ }
+            const textureIndex=textures.length; textures.push({sampler:0,source:imageIndex}); textureMap.set(texture.uuid,textureIndex); return textureIndex;
+          } catch(err) { console.warn('Textur nicht exportiert:',err); return null; }
+        }
+        function getMaterial(mat) {
+          if(!mat) mat=new THREE.MeshStandardMaterial({color:0xcccccc});
+          if(materialMap.has(mat.uuid)) return materialMap.get(mat.uuid);
+          const c=mat.color || new THREE.Color(0xffffff); const pbr={baseColorFactor:[c.r,c.g,c.b,mat.opacity ?? 1],metallicFactor:mat.metalness ?? 0,roughnessFactor:mat.roughness ?? 1};
+          const tex=getTexture(mat.map); if(tex!==null) pbr.baseColorTexture={index:tex};
+          const out={pbrMetallicRoughness:pbr,doubleSided:mat.side===THREE.DoubleSide};
+          if(mat.transparent || (mat.opacity ?? 1)<.999) out.alphaMode='BLEND';
+          const idx=materials.length; materials.push(out); materialMap.set(mat.uuid,idx); return idx;
+        }
+        modelRoot.updateMatrixWorld(true);
+        modelRoot.traverse(obj=>{
+          if(!obj.isMesh || !obj.visible || !obj.geometry?.attributes?.position) return;
+          const geo=obj.geometry; if(!geo.attributes.normal) geo.computeVertexNormals();
+          const posAttr=geo.attributes.position; const norAttr=geo.attributes.normal; const uvAttr=geo.attributes.uv;
+          const positions=new Float32Array(posAttr.count*3); const normals=new Float32Array(norAttr.count*3);
+          for(let i=0;i<posAttr.count;i++){positions[i*3]=posAttr.getX(i);positions[i*3+1]=posAttr.getY(i);positions[i*3+2]=posAttr.getZ(i);normals[i*3]=norAttr.getX(i);normals[i*3+1]=norAttr.getY(i);normals[i*3+2]=norAttr.getZ(i);}
+          let min=[Infinity,Infinity,Infinity], max=[-Infinity,-Infinity,-Infinity];
+          for(let i=0;i<positions.length;i+=3){for(let j=0;j<3;j++){const v=positions[i+j];min[j]=Math.min(min[j],v);max[j]=Math.max(max[j],v);}}
+          const attrs={POSITION:addAccessor(positions,5126,'VEC3',posAttr.count,34962,min,max),NORMAL:addAccessor(normals,5126,'VEC3',norAttr.count,34962)};
+          if(uvAttr){const uv=new Float32Array(uvAttr.count*2);for(let i=0;i<uvAttr.count;i++){uv[i*2]=uvAttr.getX(i);uv[i*2+1]=uvAttr.getY(i);}attrs.TEXCOORD_0=addAccessor(uv,5126,'VEC2',uvAttr.count,34962);}
+          const primitive={attributes:attrs,material:getMaterial(Array.isArray(obj.material)?obj.material[0]:obj.material),mode:4};
+          if(geo.index){const src=geo.index.array;let indices;if(src.length && Math.max(...src)<=65535){indices=new Uint16Array(src);}else{indices=new Uint32Array(src);}primitive.indices=addAccessor(indices,indices instanceof Uint16Array?5123:5125,'SCALAR',indices.length,34963);}
+          const meshIndex=meshes.length;meshes.push({primitives:[primitive]});
+          const pos=new THREE.Vector3(), quat=new THREE.Quaternion(), scale=new THREE.Vector3(); obj.matrixWorld.decompose(pos,quat,scale);
+          const node={mesh:meshIndex,name:obj.name || `Bauteil_${meshIndex}`,translation:[pos.x,pos.y,pos.z],rotation:[quat.x,quat.y,quat.z,quat.w],scale:[scale.x,scale.y,scale.z]};
+          nodes.push(node);
+        });
+        const total=new Uint8Array(byteLength); let cursor=0; for(const chunk of chunks){total.set(chunk,cursor);cursor+=chunk.length;}
+        const gltf={asset:{version:'2.0',generator:'CARBON / SILICON · Parametric Kit of Parts'},scene:0,scenes:[{name:'Carbon to Silicon · Gebäude',nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews,buffers:[{byteLength:total.byteLength,uri:`data:application/octet-stream;base64,${toBase64(total)}`}],samplers:[{magFilter:9729,minFilter:9987,wrapS:10497,wrapT:10497}],images,textures,extras:{raster:'3×3 m',standard:latestLayout?.params.quality,parameters:latestLayout?.params}};
+        const blob=new Blob([JSON.stringify(gltf)],{type:'model/gltf+json'}); const url=URL.createObjectURL(blob);
+        const link=document.createElement('a');link.href=url;link.download='carbon-to-silicon-building.gltf';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+        showToast('Eigenständige glTF-Datei wurde erstellt.');
+      } catch(error) { console.error('glTF-Export fehlgeschlagen:',error); showToast('glTF-Export fehlgeschlagen. Details in der Konsole.'); }
+      finally { button.disabled=false; button.textContent='↧ Export .glTF'; }
+    }
+
+    // -------------------------------------------------------------------------
+    // 10. Projektentwickler-Toolbox: Residualwert, Break-even und Sensitivität
+    // -------------------------------------------------------------------------
+    const DEV_DEFAULTS = {landPrice:0,softPct:12,contingencyPct:5,financePct:3.5,durationYears:1.5,vacancyPct:2,opexPct:3,exitYield:3.5,targetMargin:8,landFeesPct:8,rentFactor:1.20};
+    function devInput(id) {
+      const el=$(id); const raw=el.value.trim(); const n=raw===''?DEV_DEFAULTS[id]:Number(raw);
+      if(!Number.isFinite(n)) return DEV_DEFAULTS[id];
+      const min=Number(el.min||0), max=Number(el.max||1e9); return Math.min(max,Math.max(min,n));
+    }
+    function readDevAssumptions() {
+      const d={}; for(const id of Object.keys(DEV_DEFAULTS)) d[id]=devInput(id); return d;
+    }
+    function money(v) { return currency0.format(Number.isFinite(v)?v:0)+' €'; }
+    function projectModel(layout, d, scenario={}) {
+      const plotArea=layout.params.width*layout.params.depth;
+      const rent=layout.annualRent*d.rentFactor*(scenario.rentMult??1);
+      const hard=layout.constructionCost*(scenario.costMult??1);
+      const soft=hard*d.softPct/100; const contingency=hard*d.contingencyPct/100;
+      // Durchschnittlich 50 % des bis zum Exit eingesetzten Kapitals finanziert.
+      const finance=(hard+soft+contingency)*(d.financePct/100)*d.durationYears*.5;
+      const nonLand=hard+soft+contingency+finance;
+      const land=plotArea*d.landPrice; const landFees=land*d.landFeesPct/100;
+      const total=nonLand+land+landFees;
+      const vacancy=Math.min(80,Math.max(0,d.vacancyPct+(scenario.vacancyShift??0)));
+      const opex=Math.min(80,Math.max(0,d.opexPct));
+      const noi=rent*(1-vacancy/100)*(1-opex/100);
+      const cap=Math.max(1,d.exitYield+(scenario.exitShift??0))/100;
+      const exit=noi/cap; const surplus=exit-total; const margin=exit>0?surplus/exit*100:0;
+      const residualTotal=(exit*(1-d.targetMargin/100)-nonLand)/(1+d.landFeesPct/100);
+      const residualPerM2=plotArea>0?residualTotal/plotArea:0;
+      const breakEven=(total*cap)/Math.max(.01,(1-vacancy/100)*(1-opex/100)*layout.mf*12);
+      return {plotArea,hard,soft,contingency,finance,nonLand,land,landFees,total,noi,exit,surplus,margin,residualTotal,residualPerM2,breakEven};
+    }
+    function colorResult(el, value) { el.classList.remove('good','bad','positive','negative'); el.classList.add(value>=0?'good':'bad'); }
+    function updateDevelopmentDashboard(layout) {
+      const d=readDevAssumptions(); const base=projectModel(layout,d);
+      $('noiValue').textContent=money(base.noi); $('exitValue').textContent=money(base.exit);
+      $('residualValue').textContent=`${money(base.residualTotal)} · ${currency0.format(base.residualPerM2)} €/m²`;
+      $('residualSub').textContent=base.residualPerM2<0
+        ? `Kein positiver Residualwert: Exit deckt Nicht-Grundstückskosten bei ${fmt0.format(d.targetMargin)} % Zielmarge nicht.`
+        : `bei ${fmt0.format(d.targetMargin)} % Zielmarge · aktueller Bodenwert ${fmt0.format(d.landPrice)} €/m²`;
+      $('projectSurplus').textContent=money(base.surplus); colorResult($('projectSurplus'),base.surplus);
+      $('projectMarginSub').textContent=`Projektmarge auf Exit-Wert: ${fmt1.format(base.margin)} % · Gesamtinvestition ${money(base.total)}`;
+      $('breakEvenRent').textContent=`${fmt2.format(base.breakEven)} €/m²`;
+      const stress=projectModel(layout,d,{rentMult:.90,costMult:1.10,exitShift:.50,vacancyShift:2});
+      const upside=projectModel(layout,d,{rentMult:1.05,costMult:.95,exitShift:-.25,vacancyShift:-1});
+      for(const [id,val] of [['stressResult',stress.surplus],['baseResult',base.surplus],['upsideResult',upside.surplus]]){const el=$(id);el.textContent=money(val);el.classList.toggle('negative',val<0);el.classList.toggle('positive',val>=0);}
+    }
+
+    // -------------------------------------------------------------------------
+    // 11. Rendite-Optimierer: feste Kubatur, diskrete Nutzung + Standard-Suche
+    // -------------------------------------------------------------------------
+    function maximizeYield() {
+      const current=readState(); let best=null;
+      for(const quality of Object.keys(STANDARD)){
+        for(let mix=0;mix<=100;mix+=10){
+          const candidate=generateLayout({...current,quality,commercialPct:mix});
+          if(!best || candidate.yieldPct>best.yieldPct+1e-8 || (Math.abs(candidate.yieldPct-best.yieldPct)<1e-8 && candidate.efficiency>best.efficiency)){best=candidate;}
+        }
+      }
+      if(!best) return;
+      $('mixRange').value=String(best.params.commercialPct); $('qualitySelect').value=best.params.quality;
+      rebuildAll(false);
+      showToast(`Optimum bei ${best.params.commercialPct}% Gewerbe · ${STANDARD[best.params.quality].label} · ${fmt2.format(best.yieldPct)}% Bruttoanfangsrendite`);
+    }
+
+    function showToast(message) {
+      const toast = $('toast');
+      toast.textContent = message;
+      toast.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('visible'), 2400);
+    }
+
+    // -------------------------------------------------------------------------
+    // 9. UI-Events und Initialisierung
+    // -------------------------------------------------------------------------
+    function bindUI() {
+      ['widthSelect','depthSelect','floorsSelect','setbackSelect','streetSelect','neighborFloorsSelect','qualitySelect','originSelect','connectionSelect','sortingSelect'].forEach(id => {
+        $(id).addEventListener('change', () => rebuildAll(false));
+      });
+      $('mixRange').addEventListener('input', () => rebuildAll(false));
+      Object.keys(DEV_DEFAULTS).forEach(id => { const el=$(id); el.addEventListener('input',()=>{if(latestLayout) updateDevelopmentDashboard(latestLayout);}); el.addEventListener('change',()=>{if(latestLayout) updateDevelopmentDashboard(latestLayout);}); });
+      $('resetView').addEventListener('click', () => { if(latestLayout) fitCamera(latestLayout); showToast('Kameraperspektive zurückgesetzt.'); });
+      $('exportBtn').addEventListener('click', exportGLTF);
+      $('maximizeYieldBtn').addEventListener('click', maximizeYield);
+      $('contextToggle').dataset.visible='true';
+      $('contextToggle').addEventListener('click',()=>{
+        if(!contextRoot) return; contextRoot.visible=!contextRoot.visible; $('contextToggle').dataset.visible=String(contextRoot.visible);
+        $('contextToggle').textContent=contextRoot.visible?'Umfeld an':'Umfeld aus'; $('contextToggle').classList.toggle('toggle-on',contextRoot.visible);
+      });
+    }
+
+    function loadClassicThree() {
+      if (window.THREE?.WebGLRenderer) return Promise.resolve(window.THREE);
+      return new Promise((resolve,reject)=>{
+        const script=document.createElement('script');
+        script.src='https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js';
+        script.onload=()=>window.THREE?.WebGLRenderer?resolve(window.THREE):reject(new Error('CDN-Script geladen, aber THREE fehlt.'));
+        script.onerror=()=>reject(new Error('Three.js-CDN nicht erreichbar.'));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function boot() {
+      bindUI();
+      try {
+        // file:// nutzt den klassischen r160-Build und lokale Orbit-Steuerung.
+        // Auf http(s) werden ES-Module und das offizielle OrbitControls-Addon genutzt.
+        if (window.location.protocol !== 'file:') {
+          try {
+            THREE = await import('three');
+            const addon = await import('three/addons/controls/OrbitControls.js');
+            OrbitControlsImpl = addon.OrbitControls;
+          } catch (moduleError) {
+            console.warn('ES-Module/OrbitControls-Fallback:', moduleError);
+            THREE = await loadClassicThree();
+          }
+        } else {
+          THREE = await loadClassicThree();
+        }
+        if (!THREE || !THREE.WebGLRenderer) throw new Error('Three.js r160 wurde nicht geladen.');
+        initThree();
+        rebuildAll(true);
+        $('systemStatus').textContent='3×3 M RASTER AKTIV';
+        $('contextToggle').classList.add('toggle-on');
+      } catch(error) {
+        console.error('Initialisierung fehlgeschlagen:',error);
+        $('bootError').style.display='block';
+        $('bootErrorText').textContent=`Fehler: ${error?.message||error}. Prüfe die Internetverbindung zum jsDelivr-CDN. Die Datei kann per Doppelklick oder über Live Server gestartet werden.`;
+        $('systemStatus').textContent='3D ENGINE OFFLINE';
+      }
+    }
+
+    boot();
+  </script>
+</body>
+</html>
