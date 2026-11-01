@@ -12,7 +12,7 @@ Der Konfigurator ermöglicht die parametrische Gestaltung eines innerstädtische
 4. Über die Geschossnavigation die einzelnen Grundrisse ansehen.
 
 ## Live-Version (GitHub Pages)
-
+https://github.com/LorenzKra/c2s_V1_KRAYER/blob/main/index.html
 
 ## Dateien
 - `index.html` – Interaktiver Gebäudekonfigurator
